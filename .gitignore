@@ -1,0 +1,7 @@
+.vs
+build
+out
+CMakeSettings.json
+
+lib
+include/eigen3
