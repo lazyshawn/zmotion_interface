@@ -77,6 +77,8 @@ uint8_t ZauxRobot::moveL_single() {
 }
 
 uint8_t ZauxRobot::moveC() {
+	inverse_kinematics();
+	ZAux_Direct_MSpherical(handle, 5, toolAxisIdx.data(), 100, -100, 200, -300, 0, 0, 0, 20, 20);
 	return 0;
 }
 
@@ -89,13 +91,15 @@ uint8_t ZauxRobot::sin_swingL(Eigen::Vector3f displ, Eigen::Vector3f upper) {
 	ZAux_Direct_Single_Addax(handle, 6, 20);
 	ZAux_Direct_Single_Addax(handle, 7, 21);
 	ZAux_Direct_Single_Addax(handle, 8, 22);
-
+	
+	// 轨迹平面的上法线方向
 	upper.normalize();
+	// 直线轨迹的朝向
 	Eigen::Vector3f displDir = displ.normalized();
-	// 总位移
-	float dist = displ.norm();
 	// 偏移方向
 	Eigen::Vector3f offDir = displ.normalized().cross(upper);
+	// 总位移
+	float dist = displ.norm();
 
 	// 单位正弦曲线数据写入 
 	std::vector<float> sinTable(100);
@@ -105,28 +109,39 @@ uint8_t ZauxRobot::sin_swingL(Eigen::Vector3f displ, Eigen::Vector3f upper) {
 
 	// 把凸轮表数据写入 Table 寄存器值
 	ZAux_Direct_SetTable(handle, 200, 100, sinTable.data());
-	// 触发示波器
-	trigger_scope();
 
 	// 切换到逆解模式
 	inverse_kinematics();
 
+	// 读取轴速度
+	std::vector<float> vel(3);
+	for (size_t i = 0; i < vel.size(); ++i) {
+		ZAux_Direct_GetSpeed(handle, 0, &vel[i]);
+		printf("%d, vel = %f\n", i, vel[i]);
+	}
+
 	// 筛选运动量不为零的轴
 	size_t primeAxis = 0;
+	float minT = std::numeric_limits<float>::max();
 	for (size_t i = 0; i < 3; ++i) {
-		if (std::fabs(displDir[i]) > 0.5) {
+		float time = displ[i] / vel[i];
+		if (time < minT) {
+			minT = time;
 			primeAxis = i;
-			break;
 		}
 	}
+	// 主轴位移
+	float primeDist = std::fabs(displ[primeAxis]);
+	float freq = 1;
+	size_t numPeriod = std::ceil(primeDist / vel[primeAxis] * freq);
+	// 主轴的实际索引
 	primeAxis += virtualAxisIdx[0];
 
 	// 跟随一个运动量不为零的轴做凸轮运动
-	// 振幅 = 系数比例 / 脉冲当量
-	// 周期 = 参考运动的距离 / 轴速度
-	ZAux_Direct_Cambox(handle, 20, 200, 299, 100000 * offDir[0], 100, primeAxis, 4, 0);
-	ZAux_Direct_Cambox(handle, 21, 200, 299, 100000 * offDir[1], 100, primeAxis, 4, 0);
-	ZAux_Direct_Cambox(handle, 22, 200, 299, 100000 * offDir[2], 100, primeAxis, 4, 0);
+	// 振幅 = 系数比例 / 脉冲当量; 周期 = 参考运动的距离 / 轴速度
+	ZAux_Direct_Cambox(handle, 20, 200, 299, 100000 * offDir[0], primeDist / numPeriod, primeAxis, 4, 0);
+	ZAux_Direct_Cambox(handle, 21, 200, 299, 100000 * offDir[1], primeDist / numPeriod, primeAxis, 4, 0);
+	ZAux_Direct_Cambox(handle, 22, 200, 299, 100000 * offDir[2], primeDist / numPeriod, primeAxis, 4, 0);
 
 	//ZAux_Direct_Single_Move(handle, 28, -500);
 

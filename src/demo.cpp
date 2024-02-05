@@ -22,7 +22,10 @@ int main() {
 		return 1;
 	}
 
-	robot.sin_swingL({ 0, 300, -500 }, {0,1,0});
+	// 触发示波器
+	robot.trigger_scope();
+	//robot.sin_swingL({ -400, 300, -500 }, {0,1,0});
+	robot.moveC();
 
 	// 断开连接
 	robot.disconnect();
