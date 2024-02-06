@@ -12,9 +12,15 @@ constexpr static double M_PI = 3.14159265358979323846;
 
 class ZauxRobot {
 public:
+	enum class ConnType{INIT = 0, FK = 1, IK = 2};
+
 	// 控制器句柄
 	ZMC_HANDLE handle = NULL;
+	// 工具轴与关节轴的关联模式
+	ConnType connType = ConnType::INIT;
+	// 关节轴
 	std::vector<int> jointAxisIdx = { 0,1,2,3,4,5 };
+	// 工具轴
 	std::vector<int> toolAxisIdx = { 6,7,8,9,10,11 };
 	// 凸轮运动轴
 	std::vector<int> camAxisIdx = { 20, 21, 22, 23, 24, 25 };
@@ -63,9 +69,15 @@ public:
 	uint8_t moveC();
 
 	/**
-	* @brief 叠加正弦摆动的直线运动
+	* @brief 叠加摆动的直线运动
 	* @param displ    直线位移
 	* @param upper    运动平面的上方向
 	*/
-	uint8_t sin_swingL(Eigen::Vector3f displ, Eigen::Vector3f upper);
+	uint8_t swingL(Eigen::Vector3f displ, Eigen::Vector3f upper);
+
+	/**
+	* @brief 叠加摆动的圆弧运动
+	* @param traj    圆弧运动的中间点和终点
+	*/
+	uint8_t swingC(std::vector<Eigen::Vector3f> traj);
 };

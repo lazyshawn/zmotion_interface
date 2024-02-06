@@ -47,16 +47,22 @@ uint8_t ZauxRobot::trigger_scope() {
 }
 
 uint8_t ZauxRobot::forward_kinematics() {
+	if (connType == ConnType::FK) {
+		return 1;
+	}
 	//! @param handle, base(), type, tableBegin, connreframe()
 	ZAux_Direct_Connreframe(handle, toolAxisIdx.size(), toolAxisIdx.data(), 6, 0, jointAxisIdx.size(), jointAxisIdx.data());
+	connType = ConnType::FK;
 	return 0;
 }
 
 uint8_t ZauxRobot::inverse_kinematics() {
+	if (connType == ConnType::IK) {
+		return 1;
+	}
 	//! @param handle, base(), type, tableBegin, connframe()
 	ZAux_Direct_Connframe(handle, jointAxisIdx.size(), jointAxisIdx.data(), 6, 0, toolAxisIdx.size(), toolAxisIdx.data());
-
-	ZAux_Direct_Connframe(handle, jointAxisIdx.size(), jointAxisIdx.data(), 6, 0, virtualAxisIdx.size(), virtualAxisIdx.data());
+	connType = ConnType::IK;
 	return 0;
 }
 
@@ -78,19 +84,27 @@ uint8_t ZauxRobot::moveL_single() {
 
 uint8_t ZauxRobot::moveC() {
 	inverse_kinematics();
-	ZAux_Direct_MSpherical(handle, 5, toolAxisIdx.data(), 100, -100, 200, -300, 0, 0, 0, 20, 20);
+	ZAux_Direct_MSphericalAbs(handle, 6, toolAxisIdx.data(), 800, 400, 300, 900, 200, 600, 0, 20, 20, 50);
 	return 0;
 }
 
-uint8_t ZauxRobot::sin_swingL(Eigen::Vector3f displ, Eigen::Vector3f upper) {
-	// 工具虚拟轴运动叠加到真实工具轴上
-	ZAux_Direct_Single_Addax(handle, 20, 26);
-	ZAux_Direct_Single_Addax(handle, 21, 27);
-	ZAux_Direct_Single_Addax(handle, 22, 28);
-	// 凸轮轴运动叠加到真实工具轴上
-	ZAux_Direct_Single_Addax(handle, 6, 20);
-	ZAux_Direct_Single_Addax(handle, 7, 21);
-	ZAux_Direct_Single_Addax(handle, 8, 22);
+uint8_t ZauxRobot::swingL(Eigen::Vector3f displ, Eigen::Vector3f upper) {
+	// 切换到逆解模式, 关联逆解
+	inverse_kinematics();
+	// 同步虚拟工具轴位置
+	for (size_t i = 0; i < virtualAxisIdx.size(); ++i) {
+		float pos;
+		ZAux_Direct_GetMpos(handle, toolAxisIdx[0] + i, &pos);
+		ZAux_Direct_SetMpos(handle, virtualAxisIdx[0] + i, pos);
+		ZAux_Direct_SetDpos(handle, virtualAxisIdx[0] + i, pos);
+	}
+
+	for (size_t i = 0; i < virtualAxisIdx.size(); ++i) {
+		// 工具虚拟轴运动叠加到凸轮轴上
+		ZAux_Direct_Single_Addax(handle, camAxisIdx[0] + i, virtualAxisIdx[0] + i);
+		// 凸轮轴运动叠加到真实工具轴上
+		ZAux_Direct_Single_Addax(handle, toolAxisIdx[0] + i, camAxisIdx[0] + i);
+	}
 	
 	// 轨迹平面的上法线方向
 	upper.normalize();
@@ -109,9 +123,6 @@ uint8_t ZauxRobot::sin_swingL(Eigen::Vector3f displ, Eigen::Vector3f upper) {
 
 	// 把凸轮表数据写入 Table 寄存器值
 	ZAux_Direct_SetTable(handle, 200, 100, sinTable.data());
-
-	// 切换到逆解模式
-	inverse_kinematics();
 
 	// 读取轴速度
 	std::vector<float> vel(3);
@@ -150,3 +161,28 @@ uint8_t ZauxRobot::sin_swingL(Eigen::Vector3f displ, Eigen::Vector3f upper) {
 	return 0;
 }
 
+uint8_t ZauxRobot::swingC(std::vector<Eigen::Vector3f> traj) {
+	// 关联逆解
+	inverse_kinematics();
+	// 同步虚拟工具轴位置
+	for (size_t i = 0; i < virtualAxisIdx.size(); ++i) {
+		float pos;
+		ZAux_Direct_GetMpos(handle, toolAxisIdx[0] + i, &pos);
+		ZAux_Direct_SetMpos(handle, virtualAxisIdx[0] + i, pos);
+		ZAux_Direct_SetDpos(handle, virtualAxisIdx[0] + i, pos);
+	}
+
+	for (size_t i = 0; i < virtualAxisIdx.size(); ++i) {
+		// 工具虚拟轴运动叠加到凸轮轴上
+		ZAux_Direct_Single_Addax(handle, camAxisIdx[0] + i, virtualAxisIdx[0] + i);
+		// 凸轮轴运动叠加到真实工具轴上
+		ZAux_Direct_Single_Addax(handle, toolAxisIdx[0] + i, camAxisIdx[0] + i);
+	}
+
+	// 圆弧运动平面的法线方向
+
+	// 圆弧运动
+	//ZAux_Direct_Single_Move(handle, 30, 20);
+	ZAux_Direct_MSphericalAbs(handle, 6, virtualAxisIdx.data(), 800, 400, 300, 900, 200, 600, 0, 20, 20, 50);
+	return 0;
+}
