@@ -26,6 +26,14 @@ public:
 	std::vector<int> camAxisIdx = { 20, 21, 22, 23, 24, 25 };
 	// 和主轴进行相同的运动，作为凸轮跟随的参考轴
 	std::vector<int> virtualAxisIdx = { 26, 27, 28, 29, 30, 31 };
+
+	// 左停留时间
+	int leftHoldT = 0;
+	// 右停留时间
+	int rightHoldT = 0;
+	// 回中停留时间
+	int midHoldT = 0;
+
 public:
 	ZauxRobot();
 	/**
@@ -79,5 +87,7 @@ public:
 	* @brief 叠加摆动的圆弧运动
 	* @param traj    圆弧运动的中间点和终点
 	*/
-	uint8_t swingC(std::vector<Eigen::Vector3f> traj);
+	uint8_t swingC();
 };
+
+Eigen::Vector3f triangular_circumcenter(Eigen::Vector3f beg, Eigen::Vector3f mid, Eigen::Vector3f end);

@@ -1,6 +1,7 @@
 
 #include<chrono>
 #include<thread>
+#include<iostream>
 
 #include"zmotion_interface.h"
 
@@ -75,6 +76,12 @@ uint8_t ZauxRobot::moveJ_single() {
 }
 
 uint8_t ZauxRobot::moveL() {
+	// 切换到逆解模式, 关联逆解
+	inverse_kinematics();
+
+	int axisList[] = { 6,7,8 };
+	float dist[] = { 0, 0, -200 };
+	ZAux_Direct_Move(handle, 3, axisList, dist);
 	return 0;
 }
 
@@ -98,7 +105,7 @@ uint8_t ZauxRobot::swingL(Eigen::Vector3f displ, Eigen::Vector3f upper) {
 		ZAux_Direct_SetMpos(handle, virtualAxisIdx[0] + i, pos);
 		ZAux_Direct_SetDpos(handle, virtualAxisIdx[0] + i, pos);
 	}
-
+	// 运动叠加
 	for (size_t i = 0; i < virtualAxisIdx.size(); ++i) {
 		// 工具虚拟轴运动叠加到凸轮轴上
 		ZAux_Direct_Single_Addax(handle, camAxisIdx[0] + i, virtualAxisIdx[0] + i);
@@ -121,68 +128,190 @@ uint8_t ZauxRobot::swingL(Eigen::Vector3f displ, Eigen::Vector3f upper) {
 		sinTable[i] = sin(2 * M_PI * i / 99);
 	}
 
-	// 把凸轮表数据写入 Table 寄存器值
-	ZAux_Direct_SetTable(handle, 200, 100, sinTable.data());
+// 把凸轮表数据写入 Table 寄存器值
+ZAux_Direct_SetTable(handle, 200, 100, sinTable.data());
 
-	// 读取轴速度
-	std::vector<float> vel(3);
-	for (size_t i = 0; i < vel.size(); ++i) {
-		ZAux_Direct_GetSpeed(handle, 0, &vel[i]);
-		printf("%d, vel = %f\n", i, vel[i]);
-	}
-
-	// 筛选运动量不为零的轴
-	size_t primeAxis = 0;
-	float minT = std::numeric_limits<float>::max();
-	for (size_t i = 0; i < 3; ++i) {
-		float time = displ[i] / vel[i];
-		if (time < minT) {
-			minT = time;
-			primeAxis = i;
-		}
-	}
-	// 主轴位移
-	float primeDist = std::fabs(displ[primeAxis]);
-	float freq = 1;
-	size_t numPeriod = std::ceil(primeDist / vel[primeAxis] * freq);
-	// 主轴的实际索引
-	primeAxis += virtualAxisIdx[0];
-
-	// 跟随一个运动量不为零的轴做凸轮运动
-	// 振幅 = 系数比例 / 脉冲当量; 周期 = 参考运动的距离 / 轴速度
-	ZAux_Direct_Cambox(handle, 20, 200, 299, 100000 * offDir[0], primeDist / numPeriod, primeAxis, 4, 0);
-	ZAux_Direct_Cambox(handle, 21, 200, 299, 100000 * offDir[1], primeDist / numPeriod, primeAxis, 4, 0);
-	ZAux_Direct_Cambox(handle, 22, 200, 299, 100000 * offDir[2], primeDist / numPeriod, primeAxis, 4, 0);
-
-	//ZAux_Direct_Single_Move(handle, 28, -500);
-
-	int axisList[] = { 26,27,28 };
-	ZAux_Direct_Move(handle, 3, axisList, displ.data());
-	return 0;
+// 读取轴速度
+std::vector<float> vel(3);
+for (size_t i = 0; i < vel.size(); ++i) {
+	ZAux_Direct_GetSpeed(handle, 0, &vel[i]);
+	printf("%d, vel = %f\n", i, vel[i]);
 }
 
-uint8_t ZauxRobot::swingC(std::vector<Eigen::Vector3f> traj) {
+// 筛选运动量不为零的轴
+size_t primeAxis = 0;
+float minT = std::numeric_limits<float>::max();
+for (size_t i = 0; i < 3; ++i) {
+	float time = displ[i] / vel[i];
+	if (time < minT) {
+		minT = time;
+		primeAxis = i;
+	}
+}
+// 主轴位移
+float primeDist = std::fabs(displ[primeAxis]);
+// 摆动频率
+float freq = 1;
+size_t numPeriod = std::ceil(primeDist / vel[primeAxis] * freq);
+// 主轴的实际索引
+primeAxis += virtualAxisIdx[0];
+
+// 跟随一个运动量不为零的轴做凸轮运动
+// 振幅 = 系数比例 / 脉冲当量; 周期 = 参考运动的距离 / 轴速度
+ZAux_Direct_Cambox(handle, 20, 200, 299, 100000 * offDir[0], primeDist / numPeriod, primeAxis, 4, 0);
+ZAux_Direct_Cambox(handle, 21, 200, 299, 100000 * offDir[1], primeDist / numPeriod, primeAxis, 4, 0);
+ZAux_Direct_Cambox(handle, 22, 200, 299, 100000 * offDir[2], primeDist / numPeriod, primeAxis, 4, 0);
+
+int axisList[] = { 26,27,28 };
+ZAux_Direct_Move(handle, 3, axisList, displ.data());
+// 每一段的位移
+//std::vector<float> detDispl = { displ[0] / 20, displ[1] / 20, displ[2] / 20 };
+//std::cout << numPeriod << std::endl;
+//std::cout << detDispl[0] << ", " << detDispl[1] << ", " << detDispl[2] << std::endl;
+//for (size_t i = 0; i <  20; ++i) {
+//	ZAux_Direct_Move(handle, 3, axisList, detDispl.data());
+//}
+//for (size_t i = 0; i < numPeriod; ++i) {
+//	// 左位移
+//	ZAux_Direct_Move(handle, 3, axisList, detDispl.data());
+//	// 左延时
+//	for (auto& axis : axisList) {
+//		ZAux_Direct_MoveDelay(handle, axis, leftHoldT);
+//	}
+//	// 回中
+//	ZAux_Direct_Move(handle, 3, axisList, detDispl.data());
+//	// 回中延时
+//	for (auto& axis : axisList) {
+//		ZAux_Direct_MoveDelay(handle, axis, midHoldT);
+//	}
+//	// 右位移
+//	ZAux_Direct_Move(handle, 3, axisList, detDispl.data());
+//	// 右延时
+//	for (auto& axis : axisList) {
+//		ZAux_Direct_MoveDelay(handle, axis, rightHoldT);
+//	}
+//	// 回中
+//	ZAux_Direct_Move(handle, 3, axisList, detDispl.data());
+//	// 回中延时
+//	for (auto& axis : axisList) {
+//		ZAux_Direct_MoveDelay(handle, axis, midHoldT);
+//	}
+//}
+return 0;
+}
+
+uint8_t ZauxRobot::swingC() {
 	// 关联逆解
 	inverse_kinematics();
-	// 同步虚拟工具轴位置
-	for (size_t i = 0; i < virtualAxisIdx.size(); ++i) {
-		float pos;
-		ZAux_Direct_GetMpos(handle, toolAxisIdx[0] + i, &pos);
-		ZAux_Direct_SetMpos(handle, virtualAxisIdx[0] + i, pos);
-		ZAux_Direct_SetDpos(handle, virtualAxisIdx[0] + i, pos);
-	}
 
 	for (size_t i = 0; i < virtualAxisIdx.size(); ++i) {
+		float pos;
+		//ZAux_Direct_GetMpos(handle, toolAxisIdx[0] + i, &pos);
+		//ZAux_Direct_SetMpos(handle, virtualAxisIdx[0] + i, pos);
+		//ZAux_Direct_SetDpos(handle, virtualAxisIdx[0] + i, pos);
+		ZAux_Direct_SetMpos(handle, camAxisIdx[0] + i, 0);
+		ZAux_Direct_SetDpos(handle, camAxisIdx[0] + i, 0);
+	}
+	// 运动叠加
+	for (size_t i = 0; i < virtualAxisIdx.size(); ++i) {
 		// 工具虚拟轴运动叠加到凸轮轴上
-		ZAux_Direct_Single_Addax(handle, camAxisIdx[0] + i, virtualAxisIdx[0] + i);
+		//ZAux_Direct_Single_Addax(handle, camAxisIdx[0] + i, virtualAxisIdx[0] + i);
 		// 凸轮轴运动叠加到真实工具轴上
 		ZAux_Direct_Single_Addax(handle, toolAxisIdx[0] + i, camAxisIdx[0] + i);
 	}
 
-	// 圆弧运动平面的法线方向
+	Eigen::Vector3f begPnt(0, 0, 0), midPnt(0, 0, 0), endPnt(0, 0, 0);
+	// 读取圆弧起点
+	for (size_t i = 0; i < 3; ++i) {
+		ZAux_Direct_GetMpos(handle, toolAxisIdx[i], &begPnt[i]);
+	}
+	midPnt = begPnt + Eigen::Vector3f(-200, 0, -200);
+	endPnt = begPnt + Eigen::Vector3f(-400, 0, 0);
 
+	// 计算圆心坐标
+	Eigen::Vector3f center = triangular_circumcenter(begPnt, midPnt, endPnt);
+	// 半径方向
+	Eigen::Vector3f op1 = (begPnt - center).normalized(), op2 = (midPnt - center).normalized(), op3 = (endPnt - center).normalized();
+	// 半径过大
+	if (op1.norm() > 1e3) return {};
+
+	// 圆弧运动平面的法线方向
+	Eigen::Vector3f normal = op1.cross(op3);
+	if (normal.norm() < 1) {
+		normal = op1.cross(op2);
+    }
+	// 圆心角角度
+	float theta = std::acos(op1.dot(op3));
+	// 修正圆心角和正法向
+	if (op1.cross(op2).dot(op2.cross(op3)) <= 0) {
+		theta = 2 * M_PI - theta;
+		normal *= -1;
+	}
+	// 总距离
+	float dist = (begPnt - center).norm() * theta;
+
+	// 摆动频率
+	float freq = 1.0;
+	// 读取主轴速度
+	float vel = 0.0;
+	ZAux_Direct_GetSpeed(handle, toolAxisIdx[0], &vel);
+	// 周期数
+	int numPeriod = std::ceil(dist / vel * freq);
+
+	size_t num = 50;
+	size_t numInterp = numPeriod * num;
+	float dq = theta / (numInterp - 1), curQ = 0.0;
+	// 记录凸轮表数据的数组
+	std::vector<float> camX(numInterp, 0), camY(numInterp, 0), camZ(numInterp, 0);
+	for (size_t i = 0; i < numPeriod; ++i) {
+		for (size_t j = 0; j < num; j++) {
+			// 偏移方向
+			Eigen::Vector3f offDir = Eigen::AngleAxisf(curQ, normal) * op1;
+			// 切线方向
+			Eigen::Vector3f tanDir = normal.cross(offDir);
+			// 偏移相位角
+			float off = sin(float(j) / num * 2 * M_PI);
+
+			// 记录凸轮表
+			camX[i * num + j] = offDir[0] * off;
+			camY[i * num + j] = offDir[1] * off;
+			camZ[i * num + j] = offDir[2] * off;
+			std::cout << camX[i * num + j] << ", " << camZ[i * num + j] << std::endl;
+
+			// 更新当前角度
+			curQ += dq;
+		}
+	}
+
+	// 凸轮表写入 Table
+	ZAux_Direct_SetTable(handle, 1000, numInterp, camX.data());
+	ZAux_Direct_SetTable(handle, 1000+numInterp, numInterp, camY.data());
+	ZAux_Direct_SetTable(handle, 1000+2*numInterp, numInterp, camZ.data());
+
+	// 叠加凸轮运动
+	float tableMult = 10 * 1000;
+	ZAux_Direct_Cambox(handle, camAxisIdx[0], 1000, 1000 + numInterp - 1,                     tableMult, dist, 15, 4, 0);
+	ZAux_Direct_Cambox(handle, camAxisIdx[1], 1000 + numInterp, 1000 + 2 * numInterp - 1,     tableMult, dist, 15, 4, 0);
+	ZAux_Direct_Cambox(handle, camAxisIdx[2], 1000 + 2 * numInterp, 1000 + 3 * numInterp - 1, tableMult, dist, 15, 4, 0);
+
+	ZAux_Direct_Connpath(handle, 1, 6, 15);
 	// 圆弧运动
-	//ZAux_Direct_Single_Move(handle, 30, 20);
-	ZAux_Direct_MSphericalAbs(handle, 6, virtualAxisIdx.data(), 800, 400, 300, 900, 200, 600, 0, 20, 20, 50);
+	ZAux_Direct_MSphericalAbs(handle, 6, toolAxisIdx.data(), endPnt[0], endPnt[1], endPnt[2], midPnt[0], midPnt[1], midPnt[2], 0, 0, 0, 0);
 	return 0;
+}
+
+uint8_t circle_swing() {
+	// 圆弧起点、过渡点、终点
+	Eigen::Vector3d begPnt, viaPnt, endPnt;
+	return 0;
+}
+
+Eigen::Vector3f triangular_circumcenter(Eigen::Vector3f beg, Eigen::Vector3f mid, Eigen::Vector3f end) {
+	Eigen::Vector3f a = beg - mid, b = end - mid;
+	if (a.cross(b).squaredNorm() < 1e-12) {
+		float inf = std::numeric_limits<float>::max();
+		return { inf, inf, inf };
+	}
+
+	return (a.squaredNorm()*b - b.squaredNorm()*a).cross(a.cross(b)) / (2 * (a.cross(b)).squaredNorm()) + mid;
 }

@@ -25,9 +25,10 @@ int main() {
 	// 触发示波器
 	robot.trigger_scope();
 
-	//robot.swingL({ -400, 300, -500 }, {0,1,0});
-	//robot.moveC();
-	robot.swingC({ {800, 200, 600}, {300, 500, 1200} });
+	//robot.moveL();
+	//robot.swingL({ -200, 0, -200 }, {0,1,0});
+	robot.swingC();
+	//robot.swingC({ {800, 200, 600}, {300, 500, 1200} });
 
 	// 断开连接
 	robot.disconnect();
