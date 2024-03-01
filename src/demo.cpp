@@ -14,17 +14,20 @@ void commandCheckHandler(const char *command, int ret) {
 int main() {
 	ZauxRobot robot;
 	if (robot.connect("127.0.0.1") > 0) {
+		std::cout << "Connect error" << std::endl;
+		getchar();
 		return 1;
 	}
 
-	std::string basPath = "D:\\CIMC\\CppPro\\zmotion\\config\\robot_configuration.bas";
-	if (robot.load_basic_pragma(basPath.c_str()) > 0) {
-		return 1;
-	}
+	//std::string basPath = "D:\\CIMC\\CppPro\\zmotion\\config\\test\\main.bas";
+	//if (robot.load_basic_pragma(basPath.c_str()) > 0) {
+	//	return 1;
+	//}
 
 	// ´¥·¢Ê¾²¨Æ÷
 	robot.trigger_scope();
 
+	//robot.moveJ();
 	//robot.moveL();
 	//robot.swingL({ -200, 0, -200 }, {0,1,0});
 	robot.swingC();

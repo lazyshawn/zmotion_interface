@@ -10,6 +10,21 @@
 constexpr static double M_PI = 3.14159265358979323846;
 #endif
 
+class ZauxAxis {
+	static std::vector<int> AxisIdxList;
+	ZauxAxis();
+	// 读取已经下载到控制卡中的轴参数
+	//uint8_t load_uploaded_config();
+
+private:
+	// 轴类型
+	int atype;
+	// 脉冲当量
+	float units;
+	// 运动学参数
+	float speed, accel, decel;
+};
+
 class ZauxRobot {
 public:
 	enum class ConnType{INIT = 0, FK = 1, IK = 2};
@@ -20,12 +35,14 @@ public:
 	ConnType connType = ConnType::INIT;
 	// 关节轴
 	std::vector<int> jointAxisIdx = { 0,1,2,3,4,5 };
+	// 逆解轴
+	std::vector<int> ikAxisIdx = { 7,8,9,10,11,12 };
 	// 工具轴
-	std::vector<int> toolAxisIdx = { 6,7,8,9,10,11 };
+	std::vector<int> toolAxisIdx = { 20,21,22 };
 	// 凸轮运动轴
-	std::vector<int> camAxisIdx = { 20, 21, 22, 23, 24, 25 };
+	std::vector<int> camAxisIdx = { 23, 24, 25 };
 	// 和主轴进行相同的运动，作为凸轮跟随的参考轴
-	std::vector<int> virtualAxisIdx = { 26, 27, 28, 29, 30, 31 };
+	//std::vector<int> virtualAxisIdx = { 26, 27, 28, 29, 30, 31 };
 
 	// 左停留时间
 	int leftHoldT = 0;
@@ -86,6 +103,8 @@ public:
 	/**
 	* @brief 叠加摆动的圆弧运动
 	* @param traj    圆弧运动的中间点和终点
+	* @param end     圆弧终点
+	* @param via     圆弧中间点
 	*/
 	uint8_t swingC();
 };
