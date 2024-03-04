@@ -54,23 +54,43 @@ uint8_t ZauxRobot::trigger_scope() {
 }
 
 uint8_t ZauxRobot::forward_kinematics() {
-	if (connType == ConnType::FK) {
+	float kinematics = 0.0;
+	ZAux_Direct_GetUserVar(handle, "kinematic", &kinematics);
+	std::cout << "beg k = " << kinematics << std::endl;
+	if (kinematics > 0) {
 		return 1;
 	}
+	// 等待末端运动结束
+	wait_idle(20);
+	//if (connType == ConnType::FK) {
+	//	return 1;
+	//}
+	int ret = 0;
 	std::vector<int> baseAxis = { 20,21,22,6 }, connreAxis = { 7,8,9,6 };
 	//! @param handle, base(), type, tableBegin, connreframe()
 	//ZAux_Direct_Connreframe(handle, toolAxisIdx.size(), toolAxisIdx.data(), 6, 0, jointAxisIdx.size(), jointAxisIdx.data());
-	ZAux_Direct_Connreframe(handle, baseAxis.size(), baseAxis.data(), 93, 100, baseAxis.size(), baseAxis.data());
-	ZAux_Direct_Connreframe(handle, ikAxisIdx.size(), ikAxisIdx.data(), 6, 0, jointAxisIdx.size(), jointAxisIdx.data());
+	ret = ZAux_Direct_Connreframe(handle, baseAxis.size(), baseAxis.data(), 93, 100, connreAxis.size(), connreAxis.data());
+	std::cout << "1. ret = " << ret << std::endl;
+	ret = ZAux_Direct_Connreframe(handle, ikAxisIdx.size(), ikAxisIdx.data(), 6, 0, jointAxisIdx.size(), jointAxisIdx.data());
+	std::cout << "2. ret = " << ret << std::endl;
+
 	connType = ConnType::FK;
 	ZAux_Direct_SetUserVar(handle, "kinematic", 1);
 	return 0;
 }
 
 uint8_t ZauxRobot::inverse_kinematics() {
-	if (connType == ConnType::IK) {
+	float kinematics = 0.0;
+	ZAux_Direct_GetUserVar(handle, "kinematic", &kinematics);
+	std::cout << "beg k = " << kinematics << std::endl;
+	if (kinematics < 0) {
 		return 1;
 	}
+	// 等待关节运动结束
+	wait_idle(jointAxisIdx[0]);
+	//if (connType == ConnType::IK) {
+	//	return 1;
+	//}
 	std::vector<int> baseAxis = { 20,21,22,6 }, connreAxis = { 7,8,9,6 };
 	//! @param handle, base(), type, tableBegin, connframe()
 	//ZAux_Direct_Connframe(handle, jointAxisIdx.size(), jointAxisIdx.data(), 6, 0, toolAxisIdx.size(), toolAxisIdx.data());
@@ -78,18 +98,27 @@ uint8_t ZauxRobot::inverse_kinematics() {
 	ret = ZAux_Direct_Connframe(handle, jointAxisIdx.size(), jointAxisIdx.data(), 6, 0, ikAxisIdx.size(), ikAxisIdx.data());
 	ret = ZAux_Direct_Connframe(handle, connreAxis.size(), connreAxis.data(), 93, 100, baseAxis.size(), baseAxis.data());
 	connType = ConnType::IK;
-	ret = ZAux_Direct_SetUserVar(handle, "kinematic", 2);
+	ret = ZAux_Direct_SetUserVar(handle, "kinematic", -1);
 	return 0;
 }
 
-uint8_t ZauxRobot::moveJ() {
-	float tmode = 100;
-	ZAux_Direct_GetUserVar(handle, "kinematic", &tmode);
-	std::cout << "kinematic = " << tmode << std::endl;
-	ZAux_Direct_SetUserVar(handle, "kinematic", -1);
-	//int axisList[] = { 0,1,2 };
-	//float dist[] = { 0, 0, -200 };
-	//ZAux_Direct_Move(handle, 3, axisList, dist);
+uint8_t ZauxRobot::wait_idle(int axisIdx) {
+	float IDLE;
+	while (1) {
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+		ZAux_Direct_GetParam(handle, "IDLE", axisIdx, &IDLE);
+		if (IDLE < 0)break;
+	}
+	return 0;
+}
+
+uint8_t ZauxRobot::moveJ(const std::vector<float>& jntDPos) {
+	forward_kinematics();
+
+	std::vector<float> cmd(jntDPos.begin(), jntDPos.begin() + jointAxisIdx.size() + appAxisIdx.size());
+	std::vector<int> axis = jointAxisIdx;
+	axis.insert(axis.end(), appAxisIdx.begin(), appAxisIdx.end());
+	ZAux_Direct_MoveAbs(handle, axis.size(), axis.data(), cmd.data());
 	return 0;
 }
 
@@ -101,8 +130,8 @@ uint8_t ZauxRobot::moveL() {
 	// 切换到逆解模式, 关联逆解
 	inverse_kinematics();
 
-	int axisList[] = { 20, 21, 22 };
-	float dist[] = { 0, 0, -200 };
+	int axisList[] = { 20, 21, 22, 6 };
+	float dist[] = { 0, -200, 0, 0 };
 	ZAux_Direct_Move(handle, 3, axisList, dist);
 	return 0;
 }
@@ -117,75 +146,96 @@ uint8_t ZauxRobot::moveC() {
 	return 0;
 }
 
-uint8_t ZauxRobot::swingL(Eigen::Vector3f displ, Eigen::Vector3f upper) {
+uint8_t ZauxRobot::swingL(const std::vector<float>& moveCmd, Eigen::Vector3f upper) {
+	// 摆动频率
+	float freq = 4.0;
+	// 摆动振幅
+	float ampl = 2.0;
+	// 焊接速度
+	float vel = 10.0;
+
+	// 凸轮表起始索引
+	size_t sinTableBeg = 2000;
+	// 一个摆动周期的插值点数
+	size_t numInterp = 100;
+
 	// 切换到逆解模式, 关联逆解
 	inverse_kinematics();
-	// 同步虚拟工具轴位置
-	//for (size_t i = 0; i < virtualAxisIdx.size(); ++i) {
-	//	float pos;
-	//	ZAux_Direct_GetMpos(handle, toolAxisIdx[0] + i, &pos);
-	//	ZAux_Direct_SetMpos(handle, virtualAxisIdx[0] + i, pos);
-	//	ZAux_Direct_SetDpos(handle, virtualAxisIdx[0] + i, pos);
-	//}
-	// 运动叠加
-	for (size_t i = 0; i < camAxisIdx.size(); ++i) {
-		// 工具虚拟轴运动叠加到凸轮轴上
-		//ZAux_Direct_Single_Addax(handle, camAxisIdx[0] + i, virtualAxisIdx[0] + i);
-		// 凸轮轴运动叠加到真实工具轴上
-		ZAux_Direct_Single_Addax(handle, toolAxisIdx[0] + i, camAxisIdx[0] + i);
-	}
-	
+
+	// 计算摆焊参数
 	// 轨迹平面的上法线方向
 	upper.normalize();
+	// TCP 点位移
+	Eigen::Vector3f displ = { moveCmd[0], moveCmd[1], moveCmd[2] };
 	// 直线轨迹的朝向
 	Eigen::Vector3f displDir = displ.normalized();
 	// 偏移方向
 	Eigen::Vector3f offDir = displ.normalized().cross(upper);
 	// 总位移
 	float dist = displ.norm();
+	// 周期数
+	size_t numPeriod = std::ceil(dist / vel * freq);
 
-	// 单位正弦曲线数据写入 
-	std::vector<float> sinTable(100);
-	for (int i = 0; i < 100; ++i) {
-		sinTable[i] = sin(2 * M_PI * i / 99);
+	// *** 设置插补矢量轴 *************************************
+	// 等待摆动标志位置位
+	ZAux_Direct_MoveWait(handle, 15, "TABLE", swingFlagIdx, 1, 0);
+	// 使用插补矢量长度轴作为凸轮轴的跟随主轴，记录主轴的矢量运动距离，不受叠加轴影响
+	ZAux_Direct_Connpath(handle, 1, toolAxisIdx[0], 15);
+
+	// *** 设置凸轮虚拟轴 *************************************
+	for (size_t i = 0; i < camAxisIdx.size(); ++i) {
+		// 凸轮轴运动叠加到真实工具轴上
+		ZAux_Direct_Single_Addax(handle, toolAxisIdx[i], camAxisIdx[i]);
+	}
+	// 等待摆动标志位置位
+	for (size_t i = 0; i < camAxisIdx.size(); ++i) {
+		ZAux_Direct_MoveWait(handle, camAxisIdx[i], "TABLE", swingFlagIdx, 1, 0);
+	}
+	for (size_t i = 0; i < camAxisIdx.size(); ++i) {
+		// 绑定跟随凸轮表
+		ZAux_Direct_Cambox(handle, camAxisIdx[i], sinTableBeg, sinTableBeg+numInterp-1, ampl * 1000 * offDir[i], dist / numPeriod, 15, 4, 0);
 	}
 
-	// 把凸轮表数据写入 Table 寄存器值
-	ZAux_Direct_SetTable(handle, 200, 100, sinTable.data());
+	// *** 设置运动主轴 *************************************
+	// 设置主轴速度
+	for (size_t i = 0; i < toolAxisIdx.size(); ++i) {
+		ZAux_Direct_SetSpeed(handle, toolAxisIdx[i], vel);
+	}
+	// 设置附加轴不参与速度计算
+	for (size_t i = 3; i < toolAxisIdx.size(); ++i) {
+		ZAux_Direct_SetInterpFactor(handle, toolAxisIdx[i], 0);
+	}
+	// 缓冲中写入凸轮表
+	for (size_t i = 0; i < numInterp; ++i) {
+		// 插值点对应的偏移幅值
+		float tmp = std::sin(2 * M_PI * i / (numInterp - 1));
+		ZAux_Direct_MoveTable(handle, toolAxisIdx[0], sinTableBeg+i, tmp);
+		std::cout << tmp << std::endl;
+	}
+	// 主轴缓冲中将摆动标志位置位，摆动开始
+	ZAux_Direct_MoveTable(handle, toolAxisIdx[0], swingFlagIdx, 1);
 
-	// 读取轴速度
-	std::vector<float> vel(3);
-	for (size_t i = 0; i < vel.size(); ++i) {
-		ZAux_Direct_GetSpeed(handle, 0, &vel[i]);
-		printf("%d, vel = %f\n", i, vel[i]);
+	// 开始运动指令
+	std::vector<float> cmd(moveCmd.begin(), moveCmd.begin() + toolAxisIdx.size());
+	ZAux_Direct_Move(handle, toolAxisIdx.size(), toolAxisIdx.data(), cmd.data());
+
+	// 摆动结束
+	// 停止凸轮轴运动
+	for (size_t i = 0; i < camAxisIdx.size(); ++i) {
+		ZAux_Direct_MoveCancel(handle, toolAxisIdx[0], camAxisIdx[i], 0);
+	}
+	// 插补矢量轴取消绑定
+	ZAux_Direct_MoveCancel(handle, toolAxisIdx[0], 15, 0);
+	// 插补矢量轴位置清零
+	ZAux_Direct_MovePara(handle, toolAxisIdx[0], "DPOS", 15, 0);
+	// 附加轴恢复计算插补速度
+	for (size_t i = 3; i < toolAxisIdx.size(); ++i) {
+		ZAux_Direct_SetInterpFactor(handle, toolAxisIdx[i], 1);
 	}
 
-	// 筛选运动量不为零的轴
-	size_t primeAxis = 0;
-	float minT = std::numeric_limits<float>::max();
-	for (size_t i = 0; i < 3; ++i) {
-		float time = displ[i] / vel[i];
-		if (time < minT) {
-			minT = time;
-			primeAxis = i;
-		}
-	}
-	// 主轴位移
-	float primeDist = std::fabs(displ[primeAxis]);
-	// 摆动频率
-	float freq = 1;
-	size_t numPeriod = std::ceil(primeDist / vel[primeAxis] * freq);
-	// 主轴的实际索引
-	primeAxis += toolAxisIdx[0];
+	// 摆动标志位复位
+	ZAux_Direct_MoveTable(handle, toolAxisIdx[0], swingFlagIdx, -1);
 
-	// 跟随一个运动量不为零的轴做凸轮运动
-	// 振幅 = 系数比例 / 脉冲当量; 周期 = 参考运动的距离 / 轴速度
-	ZAux_Direct_Cambox(handle, 20, 200, 299, 100000 * offDir[0], primeDist / numPeriod, primeAxis, 4, 0);
-	ZAux_Direct_Cambox(handle, 21, 200, 299, 100000 * offDir[1], primeDist / numPeriod, primeAxis, 4, 0);
-	ZAux_Direct_Cambox(handle, 22, 200, 299, 100000 * offDir[2], primeDist / numPeriod, primeAxis, 4, 0);
-
-	int axisList[] = { 26,27,28 };
-	ZAux_Direct_Move(handle, 3, axisList, displ.data());
 	// 每一段的位移
 	//std::vector<float> detDispl = { displ[0] / 20, displ[1] / 20, displ[2] / 20 };
 	//std::cout << numPeriod << std::endl;

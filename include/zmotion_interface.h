@@ -1,7 +1,8 @@
 #pragma once
 
 #include<vector>
-#include <eigen3/Eigen/Dense>
+#include<eigen3/Eigen/Dense>
+#include<chrono>
 
 #include "zmotion.h"
 #include "zauxdll2.h"
@@ -15,6 +16,8 @@ class ZauxAxis {
 	ZauxAxis();
 	// 读取已经下载到控制卡中的轴参数
 	//uint8_t load_uploaded_config();
+	// 加载轴参数
+	uint8_t download_config();
 
 private:
 	// 轴类型
@@ -37,8 +40,10 @@ public:
 	std::vector<int> jointAxisIdx = { 0,1,2,3,4,5 };
 	// 逆解轴
 	std::vector<int> ikAxisIdx = { 7,8,9,10,11,12 };
+	// 附加轴
+	std::vector<int> appAxisIdx = { 6 };
 	// 工具轴
-	std::vector<int> toolAxisIdx = { 20,21,22 };
+	std::vector<int> toolAxisIdx = { 20, 21, 22, 6 };
 	// 凸轮运动轴
 	std::vector<int> camAxisIdx = { 23, 24, 25 };
 	// 和主轴进行相同的运动，作为凸轮跟随的参考轴
@@ -50,6 +55,9 @@ public:
 	int rightHoldT = 0;
 	// 回中停留时间
 	int midHoldT = 0;
+
+	// 摆动标志位索引
+	size_t swingFlagIdx = 1000;
 
 public:
 	ZauxRobot();
@@ -87,7 +95,9 @@ public:
 	*/
 	uint8_t inverse_kinematics();
 
-	uint8_t moveJ();
+	uint8_t wait_idle(int axisIdx);
+
+	uint8_t moveJ(const std::vector<float>& jntDPos);
 	uint8_t moveJ_single();
 	uint8_t moveL();
 	uint8_t moveL_single();
@@ -95,10 +105,10 @@ public:
 
 	/**
 	* @brief 叠加摆动的直线运动
-	* @param displ    直线位移
-	* @param upper    运动平面的上方向
+	* @param moveCmd    位移指令，前三个元素为 TCP 点位移，后续元素为附加轴位移
+	* @param upper      运动平面的上方向
 	*/
-	uint8_t swingL(Eigen::Vector3f displ, Eigen::Vector3f upper);
+	uint8_t swingL(const std::vector<float>& moveCmd, Eigen::Vector3f upper);
 
 	/**
 	* @brief 叠加摆动的圆弧运动
