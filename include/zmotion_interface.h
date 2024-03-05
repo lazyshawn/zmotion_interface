@@ -116,7 +116,7 @@ public:
 	* @param end     圆弧终点
 	* @param via     圆弧中间点
 	*/
-	uint8_t swingC();
+	uint8_t swingC(const std::vector<float>& endConfig, const std::vector<float>& midConfig);
 };
 
 Eigen::Vector3f triangular_circumcenter(Eigen::Vector3f beg, Eigen::Vector3f mid, Eigen::Vector3f end);
