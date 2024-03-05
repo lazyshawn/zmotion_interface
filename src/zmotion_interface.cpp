@@ -60,7 +60,7 @@ uint8_t ZauxRobot::forward_kinematics() {
 	if (kinematics > 0) {
 		return 1;
 	}
-	// 等待末端运动结束
+	// 等待末端运动结束，工具轴+附加轴
 	wait_idle(20);
 	//if (connType == ConnType::FK) {
 	//	return 1;
@@ -70,9 +70,7 @@ uint8_t ZauxRobot::forward_kinematics() {
 	//! @param handle, base(), type, tableBegin, connreframe()
 	//ZAux_Direct_Connreframe(handle, toolAxisIdx.size(), toolAxisIdx.data(), 6, 0, jointAxisIdx.size(), jointAxisIdx.data());
 	ret = ZAux_Direct_Connreframe(handle, baseAxis.size(), baseAxis.data(), 93, 100, connreAxis.size(), connreAxis.data());
-	std::cout << "1. ret = " << ret << std::endl;
 	ret = ZAux_Direct_Connreframe(handle, ikAxisIdx.size(), ikAxisIdx.data(), 6, 0, jointAxisIdx.size(), jointAxisIdx.data());
-	std::cout << "2. ret = " << ret << std::endl;
 
 	connType = ConnType::FK;
 	ZAux_Direct_SetUserVar(handle, "kinematic", 1);
@@ -86,7 +84,7 @@ uint8_t ZauxRobot::inverse_kinematics() {
 	if (kinematics < 0) {
 		return 1;
 	}
-	// 等待关节运动结束
+	// 等待关节运动结束，关节轴+附加轴
 	wait_idle(jointAxisIdx[0]);
 	//if (connType == ConnType::IK) {
 	//	return 1;
@@ -210,7 +208,6 @@ uint8_t ZauxRobot::swingL(const std::vector<float>& moveCmd, Eigen::Vector3f upp
 		// 插值点对应的偏移幅值
 		float tmp = std::sin(2 * M_PI * i / (numInterp - 1));
 		ZAux_Direct_MoveTable(handle, toolAxisIdx[0], sinTableBeg+i, tmp);
-		std::cout << tmp << std::endl;
 	}
 	// 主轴缓冲中将摆动标志位置位，摆动开始
 	ZAux_Direct_MoveTable(handle, toolAxisIdx[0], swingFlagIdx, 1);
@@ -274,7 +271,7 @@ uint8_t ZauxRobot::swingL(const std::vector<float>& moveCmd, Eigen::Vector3f upp
 
 uint8_t ZauxRobot::swingC(const std::vector<float>& endConfig, const std::vector<float>& midConfig) {
 	// 摆动频率
-	float freq = 4.0;
+	float freq = 0.2;
 	// 摆动振幅
 	float ampl = 2.0;
 	// 焊接速度
@@ -382,6 +379,24 @@ uint8_t ZauxRobot::swingC(const std::vector<float>& endConfig, const std::vector
 
 	// 开始运动指令
 	ZAux_Direct_MSphericalAbs(handle, 3, toolAxisIdx.data(), endPnt[0], endPnt[1], endPnt[2], midPnt[0], midPnt[1], midPnt[2], 0, 0, 0, 0);
+	//dq = theta / numPeriod / 2;
+	//curQ = 0.0;
+	//op1 = begPnt - center;
+	//std::cout << (op1 + center).transpose() << std::endl;
+	//for (size_t i = 0; i < numPeriod; ++i) {
+	//	Eigen::Vector3f curMid(0,0,0), curEnd(0,0,0);
+	//	curQ += dq;
+	//	curMid = Eigen::AngleAxisf(curQ, normal) * op1 + center;
+	//	std::cout << curMid.transpose() << std::endl;
+	//	curQ += dq;
+	//	curEnd = Eigen::AngleAxisf(curQ, normal) * op1 + center;
+	//	std::cout << curEnd.transpose() << std::endl;
+	//	ZAux_Direct_MSphericalAbs(handle, 3, toolAxisIdx.data(), curEnd[0], curEnd[1], curEnd[2], curMid[0], curMid[1], curMid[2], 0, 0, 0, 0);
+	//	// 延时
+	//	for (auto& axis : toolAxisIdx) {
+	//		ZAux_Direct_MoveDelay(handle, axis, 1000);
+	//	}
+	//}
 
 	// 摆动结束
 	// 停止凸轮轴运动
@@ -393,9 +408,9 @@ uint8_t ZauxRobot::swingC(const std::vector<float>& endConfig, const std::vector
 	// 插补矢量轴位置清零
 	ZAux_Direct_MovePara(handle, toolAxisIdx[0], "DPOS", 15, 0);
 	// 附加轴恢复计算插补速度
-	for (size_t i = 3; i < toolAxisIdx.size(); ++i) {
-		ZAux_Direct_SetInterpFactor(handle, toolAxisIdx[i], 1);
-	}
+	//for (size_t i = 3; i < toolAxisIdx.size(); ++i) {
+	//	ZAux_Direct_SetInterpFactor(handle, toolAxisIdx[i], 1);
+	//}
 
 	// 摆动标志位复位
 	ZAux_Direct_MoveTable(handle, toolAxisIdx[0], swingFlagIdx, -1);
