@@ -1,5 +1,7 @@
 #include <windows.h>
 #include<iostream>
+#include<fstream>
+#include<bitset>
 
 #include"zmotion_interface.h"
 
@@ -11,31 +13,102 @@ void commandCheckHandler(const char *command, int ret) {
 	}
 }
 
+ZauxRobot robot;
+
+void test_dec_to_hex();
+void test_hex_to_dec(uint16_t high, uint16_t low);
+void format_float(std::string ifname, std::string ofname);
+void test_swing();
+
 int main() {
-	ZauxRobot robot;
+	//format_float("C:\\Users\\15874\\Desktop\\SD0.BIN", "C:\\Users\\15874\\Desktop\\SD0.txt");
+
 	if (robot.connect("127.0.0.1") > 0) {
 		std::cout << "Connect error" << std::endl;
 		getchar();
 		return 1;
 	}
 
-	//std::string basPath = "D:\\CIMC\\CppPro\\zmotion\\config\\test\\main.bas";
-	//if (robot.load_basic_pragma(basPath.c_str()) > 0) {
-	//	return 1;
-	//}
+
+	////std::string basPath = "D:\\CIMC\\CppPro\\zmotion\\config\\test\\main.bas";
+	////if (robot.load_basic_pragma(basPath.c_str()) > 0) {
+	////	return 1;
+	////}
 
 	// 触发示波器
 	robot.trigger_scope();
 
-	robot.moveJ({ 0, -6.8221, 14.3160, -0.0000, 55.1156, 0, 0 });
-	//robot.moveL();
-	//robot.swingL({ -200, 0, 0, 200 }, {0,0,1});
-	//robot.swingC();
-	robot.swingC({1467.749, -2.06, 163.68}, {1267.749, -2.06, 363.68});
+	//robot.moveJ({ 0, -6.8221, 14.3160, -0.0000, 55.1156, 0, 0 });
+	////robot.moveL();
+	////robot.swingL({ -200, 0, 0, 200 }, {0,0,1});
+	////robot.swingC();
+	//robot.swingC({1467.749, -2.06, 163.68}, {1267.749, -2.06, 363.68});
+	////robot.swingL({ -200, 0, 0, 200 }, {0,0,1});
 
-	// 断开连接
-	robot.disconnect();
+	test_swing();
+
+	//// 断开连接
+	//robot.disconnect();
 	return 0;
+}
+
+void test_swing() {
+	robot.waveCfg.Freq = 1;
+	robot.waveCfg.Width = 20;
+	
+	robot.moveJ({ -1.8055, 7.2945, 24.1143, -2.5585, 69.5887, 5.4886, 0.0 });
+	//robot.swingL({ 0, -200, 0, 0 });
+
+	//robot.moveJ({ 0, -6.8221, 14.3160, -0.0000, 55.1156, 30, 0 });
+	//robot.swingC({ 1467.749, 200.06, 163.68 }, { 1267.749, -200.06, 663.68 });
+	robot.swingC({ 884.4090, -68.5060, 78.8420 }, { 934.4090, -18.5060, 78.8420 });
+}
+
+void format_float(std::string ifname, std::string ofname) {
+	std::ifstream in(ifname, std::ios::binary);
+	std::ofstream out(ofname, std::ios::trunc);
+	if (!in.is_open() || !out.is_open()) {
+		std::cout << "ERROR: file is not opened." << std::endl;
+	}
+
+	char s;
+	size_t idx = 0;
+	std::string numStr;
+	numStr.clear();
+	while (in.get(s)) {
+		std::bitset<8> bits(s);
+		numStr = bits.to_string() + numStr;
+		if (idx++ == 3) {
+			std::bitset<32> num(numStr);
+			float fNum = *reinterpret_cast<float*>(&num);
+			std::cout << fNum << std::endl;
+			out << fNum << std::endl;
+			numStr.clear();
+			idx = 0;
+		}
+	}
+	in.close();
+}
+
+void test_dec_to_hex() {
+	int dec = 65533;
+	uint16_t bin = dec;
+	// 低八位
+	uint8_t low = bin & 0x00FF;
+	// 高八位
+	uint8_t high = bin >> 8;
+	printf("high = %d\n", high);
+	printf("low = %d\n", low);
+}
+
+void test_hex_to_dec(uint16_t high, uint16_t low) {
+	//uint16_t high = 12;
+	//uint16_t low = 12;
+	uint16_t dec = (high << 8) + low;
+
+	std::cout << high << ", " << low << " -> ";
+	printf("dec = %d\n", dec);
+	std::cout << dec * 1000 / 65535.0 << std::endl;
 }
 
 int test() {

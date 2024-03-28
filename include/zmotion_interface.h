@@ -7,6 +7,8 @@
 #include "zmotion.h"
 #include "zauxdll2.h"
 
+#include"FsCraftDef.h"
+
 #ifndef M_PI
 constexpr static double M_PI = 3.14159265358979323846;
 #endif
@@ -58,6 +60,8 @@ public:
 
 	// 摆动标志位索引
 	size_t swingFlagIdx = 1000;
+	// 摆焊参数
+	Weave waveCfg;
 
 public:
 	ZauxRobot();
@@ -109,6 +113,7 @@ public:
 	* @param upper      运动平面的上方向
 	*/
 	uint8_t swingL(const std::vector<float>& moveCmd, Eigen::Vector3f upper);
+	uint8_t swingL(const std::vector<float>& moveCmd);
 
 	/**
 	* @brief 叠加摆动的圆弧运动
