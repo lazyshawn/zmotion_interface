@@ -19,16 +19,24 @@ void test_dec_to_hex();
 void test_hex_to_dec(uint16_t high, uint16_t low);
 void format_float(std::string ifname, std::string ofname);
 void test_swing();
+void test_zswing();
 
 int main() {
 	//format_float("C:\\Users\\15874\\Desktop\\SD0.BIN", "C:\\Users\\15874\\Desktop\\SD0.txt");
+
+	//float x = 40.90654, units = 1000.0;
+	//float ans = floor(x*units);
+	//ans = 40906.0 / units;
+
+	//std::cout << ans << std::endl;
 
 	if (robot.connect("127.0.0.1") > 0) {
 		std::cout << "Connect error" << std::endl;
 		getchar();
 		return 1;
 	}
-
+	//robot.forward_kinematics();
+	//robot.inverse_kinematics();
 
 	////std::string basPath = "D:\\CIMC\\CppPro\\zmotion\\config\\test\\main.bas";
 	////if (robot.load_basic_pragma(basPath.c_str()) > 0) {
@@ -36,32 +44,71 @@ int main() {
 	////}
 
 	// 触发示波器
-	robot.trigger_scope();
+	//robot.trigger_scope();
 
 	//robot.moveJ({ 0, -6.8221, 14.3160, -0.0000, 55.1156, 0, 0 });
 	////robot.moveL();
 	////robot.swingL({ -200, 0, 0, 200 }, {0,0,1});
-	////robot.swingC();
 	//robot.swingC({1467.749, -2.06, 163.68}, {1267.749, -2.06, 363.68});
 	////robot.swingL({ -200, 0, 0, 200 }, {0,0,1});
 
 	test_swing();
+	//test_zswing();
 
 	//// 断开连接
 	//robot.disconnect();
 	return 0;
 }
 
-void test_swing() {
+void test_zswing() {
 	robot.waveCfg.Freq = 1;
 	robot.waveCfg.Width = 20;
-	
+	robot.waveCfg.Dwell_left = 1000;
+	robot.waveCfg.Dwell_right = 1000;
+
+	int ret = 0;
 	robot.moveJ({ -1.8055, 7.2945, 24.1143, -2.5585, 69.5887, 5.4886, 0.0 });
-	//robot.swingL({ 0, -200, 0, 0 });
+
+
+	//ZAux_Direct_MovePara(robot.handle_, 0, "VECTOR_MOVED", robot.toolAxisIdx_[0], 0);
+
+	robot.wait_idle(0);
+	std::this_thread::sleep_for(std::chrono::seconds(2));
+
+	ret += robot.swing_on();
+	//robot.moveL();
+	// 获取当前位置
+
+	robot.zswingC({ 1467.749, 200.06, 163.68 }, { 1267.749, -200.06, 663.68 });
+	ret += robot.swing_off();
+
+	//robot.moveL();
+
+}
+
+void test_swing() {
+	robot.waveCfg.Freq = 1;
+	robot.waveCfg.Width = 1;
+	robot.waveCfg.Dwell_left = 1000;
+	robot.waveCfg.Dwell_right = 1000;
+	
+	//robot.moveJ({ -1.8055, 7.2945, 24.1143, -2.5585, 69.5887, 5.4886, 0.0 });
+	//robot.swingL({ 0, -100, 0, 0 });
+	//robot.swingL({ 0, -100, 0, 0 });
 
 	//robot.moveJ({ 0, -6.8221, 14.3160, -0.0000, 55.1156, 30, 0 });
+	//robot.swingC_({ 1034.4090, -118.5060, 78.8420 }, { 1034.4090, -18.5060, 78.8420 });
 	//robot.swingC({ 1467.749, 200.06, 163.68 }, { 1267.749, -200.06, 663.68 });
-	robot.swingC({ 884.4090, -68.5060, 78.8420 }, { 934.4090, -18.5060, 78.8420 });
+
+	robot.moveJ({ -15.9641, 33.5979, 3.9740, 16.2066, 76.0944, 31.1940, 0.0 });
+	//robot.swingC_({ 1244.7410, -44.3710, -73.6200, -201.6840, -40.8120, 227.0230 }, { 1265.5150, -90.9640, -73.2900, -177.6410, -41.2930, 175.6090 });
+	robot.swingC({ 1244.7410, -44.3710, -73.6200 }, { 1265.5150, -90.9640, -73.2900 });
+
+
+	//robot.inverse_kinematics();
+	//int toolAxis[] = { 20,21,22,10,11,12 }, ret = 0.0;
+	//ret = ZAux_Direct_MSphericalAbs(robot.handle_, 6, toolAxis, 1467.749, 200.06, 163.68, 1267.749, -200.06, 663.68, 0, 0, 0, 0);
+	//robot.swingC({ 884.4090, -68.5060, 78.8420 }, { 934.4090, -18.5060, 78.8420 });
 }
 
 void format_float(std::string ifname, std::string ofname) {
@@ -154,7 +201,7 @@ int test() {
 	ZAux_Trigger(handle);
 
 	// 切换到逆解模式：每次执行工具坐标系运动时需要绑定一次，同步计算关节坐标变化
-	ZAux_Direct_Connframe(handle, robot.jointAxisIdx.size(), robot.jointAxisIdx.data(), 6, 0, robot.toolAxisIdx.size(), robot.toolAxisIdx.data());
+	ZAux_Direct_Connframe(handle, robot.jointAxisIdx_.size(), robot.jointAxisIdx_.data(), 6, 0, robot.toolAxisIdx_.size(), robot.toolAxisIdx_.data());
 
 	// 参考轴 1 运动到 100 位置时，跟随轴 0启动凸轮表运动
 	/**

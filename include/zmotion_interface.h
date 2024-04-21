@@ -3,6 +3,7 @@
 #include<vector>
 #include<eigen3/Eigen/Dense>
 #include<chrono>
+#include<thread>
 
 #include "zmotion.h"
 #include "zauxdll2.h"
@@ -35,19 +36,19 @@ public:
 	enum class ConnType{INIT = 0, FK = 1, IK = 2};
 
 	// 控制器句柄
-	ZMC_HANDLE handle = NULL;
+	ZMC_HANDLE handle_ = NULL;
 	// 工具轴与关节轴的关联模式
 	ConnType connType = ConnType::INIT;
 	// 关节轴
-	std::vector<int> jointAxisIdx = { 0,1,2,3,4,5 };
+	std::vector<int> jointAxisIdx_ = { 0,1,2,3,4,5 };
 	// 逆解轴
-	std::vector<int> ikAxisIdx = { 7,8,9,10,11,12 };
+	std::vector<int> ikAxisIdx_ = { 7,8,9,10,11,12 };
 	// 附加轴
-	std::vector<int> appAxisIdx = { 6 };
+	std::vector<int> appAxisIdx_ = { 6 };
 	// 工具轴
-	std::vector<int> toolAxisIdx = { 20, 21, 22, 6 };
+	std::vector<int> toolAxisIdx_ = { 20, 21, 22, 6 };
 	// 凸轮运动轴
-	std::vector<int> camAxisIdx = { 23, 24, 25 };
+	std::vector<int> camAxisIdx_ = { 23, 24, 25 };
 	// 和主轴进行相同的运动，作为凸轮跟随的参考轴
 	//std::vector<int> virtualAxisIdx = { 26, 27, 28, 29, 30, 31 };
 
@@ -101,11 +102,14 @@ public:
 
 	uint8_t wait_idle(int axisIdx);
 
+	uint8_t swing_on();
+	uint8_t swing_off();
 	uint8_t moveJ(const std::vector<float>& jntDPos);
 	uint8_t moveJ_single();
 	uint8_t moveL();
 	uint8_t moveL_single();
-	uint8_t moveC();
+	uint8_t moveC(const std::vector<float>& endConfig, const std::vector<float>& midConfig);
+
 
 	/**
 	* @brief 叠加摆动的直线运动
@@ -114,6 +118,7 @@ public:
 	*/
 	uint8_t swingL(const std::vector<float>& moveCmd, Eigen::Vector3f upper);
 	uint8_t swingL(const std::vector<float>& moveCmd);
+	uint8_t swingLAbs(const std::vector<float>& moveCmd);
 
 	/**
 	* @brief 叠加摆动的圆弧运动
@@ -122,6 +127,8 @@ public:
 	* @param via     圆弧中间点
 	*/
 	uint8_t swingC(const std::vector<float>& endConfig, const std::vector<float>& midConfig);
+	uint8_t zswingC(const std::vector<float>& endConfig, const std::vector<float>& midConfig);
+	uint8_t swingC_(const std::vector<float>& endConfig, const std::vector<float>& midConfig);
 };
 
 Eigen::Vector3f triangular_circumcenter(Eigen::Vector3f beg, Eigen::Vector3f mid, Eigen::Vector3f end);
