@@ -523,7 +523,7 @@ uint8_t ZauxRobot::swingC(const std::vector<float>& endConfig, const std::vector
 	// 摆动振幅
 	float ampl = waveCfg.Width / 2;
 	// 焊接速度
-	float vel = 20.0;
+	float vel = 5.0;
 
 	// 凸轮表起始索引
 	size_t sinTableBeg = 2000;
@@ -533,12 +533,15 @@ uint8_t ZauxRobot::swingC(const std::vector<float>& endConfig, const std::vector
 	// 切换到逆解模式, 关联逆解
 	inverse_kinematics();
 	
+	Eigen::Vector3f begAngle, detAngle{ 0,0,0 };
+
 	// *** 计算摆焊参数 ***************************************
 	// 读取当前缓冲最终位置处的欧拉角(deg)
 	Eigen::Vector3f zEuler(0, 0, 0);
 	for (size_t i = 0; i < 3; ++i) {
 		ZAux_Direct_GetEndMoveBuffer(handle_, 10 + i, &zEuler[i]);
 	}
+	begAngle = zEuler;
 	zEuler *= M_PI / 180;
 	// 缓冲最终位置的工具 Z 方向
 	Eigen::Vector3f zDir(0, 0, 0);
@@ -665,19 +668,30 @@ uint8_t ZauxRobot::swingC(const std::vector<float>& endConfig, const std::vector
 	ZAux_Direct_MoveTable(handle_, toolAxisIdx_[0], swingFlagIdx, 1);
 
 	// 开始运动指令
-	ZAux_Direct_MSphericalAbs(handle_, 3, toolAxisIdx_.data(), endPnt[0], endPnt[1], endPnt[2], midPnt[0], midPnt[1], midPnt[2], 0, 0, 0, 0);
-	//dq = theta / numPeriod / 2;
-	//curQ = 0.0;
-	//op1 = begPnt - center;
-	////std::cout << (op1 + center).transpose() << std::endl;
-	//for (size_t i = 0; i < numPeriod; ++i) {
-	//	Eigen::Vector3f curMid(0, 0, 0), curEnd(0, 0, 0);
-	//	curQ += dq;
-	//	curMid = Eigen::AngleAxisf(curQ, normal) * op1 + center;
-	//	curQ += dq;
-	//	curEnd = Eigen::AngleAxisf(curQ, normal) * op1 + center;
-	//	ZAux_Direct_MSphericalAbs(handle_, 3, toolAxisIdx_.data(), curEnd[0], curEnd[1], curEnd[2], curMid[0], curMid[1], curMid[2], 0, 0, 0, 0);
-	//}
+	//ZAux_Direct_MSphericalAbs(handle_, 3, toolAxisIdx_.data(), endPnt[0], endPnt[1], endPnt[2], midPnt[0], midPnt[1], midPnt[2], 0, 0, 0, 0);
+	dq = theta / numPeriod / 2;
+	curQ = 0.0;
+	op1 = begPnt - center;
+	if (endConfig.size() > 5) {
+		for (size_t i = 0; i < 3; ++i) {
+			detAngle[i] = (endConfig[3 + i] - begAngle[i]) / numPeriod / 2;
+		}
+	}
+	int toolAxisIdx[6] = {20,21,22,10,11,12};
+	Eigen::Vector3f curAngle = begAngle;
+	for (size_t i = 0; i < numPeriod; ++i) {
+		Eigen::Vector3f curMid(0, 0, 0), curEnd(0, 0, 0);
+		curQ += dq;
+		curMid = Eigen::AngleAxisf(curQ, normal) * op1 + center;
+		curAngle = detAngle;
+		curQ += dq;
+		curEnd = Eigen::AngleAxisf(curQ, normal) * op1 + center;
+		curAngle = detAngle;
+		//ZAux_Direct_MSphericalAbs(handle_, 3, toolAxisIdx_.data(), curEnd[0], curEnd[1], curEnd[2], curMid[0], curMid[1], curMid[2], 0, 0, 0, 0);
+		ZAux_Direct_MSphericalAbs(handle_, 6, toolAxisIdx, curEnd[0], curEnd[1], curEnd[2], curMid[0], curMid[1], curMid[2], 0, curAngle[0], curAngle[1], curAngle[2]);
+		//std::cout << "ret = " << ret << std::endl;
+		ZAux_Direct_MoveDelay(handle_, toolAxisIdx_[0], 100);
+	}
 
 	// 摆动结束
 	// 停止凸轮轴运动
@@ -776,7 +790,7 @@ uint8_t ZauxRobot::zswingC(const std::vector<float>& endConfig, const std::vecto
 	float dq = theta / numPeriod / 2, curQ = 0.0;
 	op1 = begPnt - center;
 
-	ZAux_Direct_MSphericalAbs(handle_, 3, toolAxisIdx_.data(), endConfig[0], endConfig[1], endConfig[2], midConfig[0], midConfig[1], midConfig[2], 0, 0, 0, 0);
+	//ZAux_Direct_MSphericalAbs(handle_, 3, toolAxisIdx_.data(), endConfig[0], endConfig[1], endConfig[2], midConfig[0], midConfig[1], midConfig[2], 0, 0, 0, 0);
 	//// 记录凸轮表数据的数组
 	//for (size_t i = 0; i < numPeriod; ++i) {
 	//	// 当前周期的运动

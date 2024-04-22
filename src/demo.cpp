@@ -24,13 +24,8 @@ void test_zswing();
 int main() {
 	//format_float("C:\\Users\\15874\\Desktop\\SD0.BIN", "C:\\Users\\15874\\Desktop\\SD0.txt");
 
-	//float x = 40.90654, units = 1000.0;
-	//float ans = floor(x*units);
-	//ans = 40906.0 / units;
-
-	//std::cout << ans << std::endl;
-
-	if (robot.connect("127.0.0.1") > 0) {
+	//if (robot.connect("127.0.0.1") > 0) {
+	if (robot.connect("192.168.1.14") > 0) {
 		std::cout << "Connect error" << std::endl;
 		getchar();
 		return 1;
@@ -88,7 +83,7 @@ void test_zswing() {
 
 void test_swing() {
 	robot.waveCfg.Freq = 1;
-	robot.waveCfg.Width = 1;
+	robot.waveCfg.Width = 5;
 	robot.waveCfg.Dwell_left = 1000;
 	robot.waveCfg.Dwell_right = 1000;
 	
@@ -101,8 +96,8 @@ void test_swing() {
 	//robot.swingC({ 1467.749, 200.06, 163.68 }, { 1267.749, -200.06, 663.68 });
 
 	robot.moveJ({ -15.9641, 33.5979, 3.9740, 16.2066, 76.0944, 31.1940, 0.0 });
-	//robot.swingC_({ 1244.7410, -44.3710, -73.6200, -201.6840, -40.8120, 227.0230 }, { 1265.5150, -90.9640, -73.2900, -177.6410, -41.2930, 175.6090 });
-	robot.swingC({ 1244.7410, -44.3710, -73.6200 }, { 1265.5150, -90.9640, -73.2900 });
+	robot.swingC({ 1244.7410, -44.3710, -73.6200, -201.6840, -40.8120, 227.0230 }, { 1265.5150, -90.9640, -73.2900, -177.6410, -41.2930, 175.6090 });
+	//robot.swingC({ 1244.7410, -44.3710, -73.6200 }, { 1265.5150, -90.9640, -73.2900 });
 
 
 	//robot.inverse_kinematics();
