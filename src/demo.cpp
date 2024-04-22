@@ -82,7 +82,7 @@ void test_zswing() {
 }
 
 void test_swing() {
-	robot.waveCfg.Freq = 1;
+	robot.waveCfg.Freq = 1.5;
 	robot.waveCfg.Width = 5;
 	robot.waveCfg.Dwell_left = 1000;
 	robot.waveCfg.Dwell_right = 1000;
@@ -96,9 +96,18 @@ void test_swing() {
 	//robot.swingC({ 1467.749, 200.06, 163.68 }, { 1267.749, -200.06, 663.68 });
 
 	robot.moveJ({ -15.9641, 33.5979, 3.9740, 16.2066, 76.0944, 31.1940, 0.0 });
+	robot.wait_idle(0);
+	std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+	std::cout << "Begin" << std::endl;
+	//robot.wlder_on(240, 30);
+	std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
 	robot.swingC({ 1244.7410, -44.3710, -73.6200, -201.6840, -40.8120, 227.0230 }, { 1265.5150, -90.9640, -73.2900, -177.6410, -41.2930, 175.6090 });
 	//robot.swingC({ 1244.7410, -44.3710, -73.6200 }, { 1265.5150, -90.9640, -73.2900 });
 
+	robot.wait_idle(20);
+	std::cout << "End" << std::endl;
+	//robot.wlder_off();
 
 	//robot.inverse_kinematics();
 	//int toolAxis[] = { 20,21,22,10,11,12 }, ret = 0.0;

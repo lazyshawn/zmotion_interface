@@ -110,6 +110,9 @@ public:
 	uint8_t moveL_single();
 	uint8_t moveC(const std::vector<float>& endConfig, const std::vector<float>& midConfig);
 
+	// 焊机控制
+	uint8_t wlder_on(float current, float voltage);
+	uint8_t wlder_off();
 
 	/**
 	* @brief 叠加摆动的直线运动
