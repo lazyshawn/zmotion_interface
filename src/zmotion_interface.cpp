@@ -383,6 +383,194 @@ uint8_t ZauxRobot::swingL(const std::vector<float>& moveCmd) {
 	// TCP 姿态轴号
 	std::vector<int> poseAxisIdx = { ikAxisIdx_[3], ikAxisIdx_[4], ikAxisIdx_[5] };
 	// 凸轮轴轴号
+	std::vector<int> camAxisIdx = { camAxisIdx_[0], camAxisIdx_[1], camAxisIdx_[2] };
+	// 跟随矢量轴轴号
+	int connpathAxisIdx = 15;
+
+	// 凸轮表起始索引
+	size_t sinTableBeg = 2000;
+	// 一个摆动周期的插值点数
+	size_t numInterp = 100;
+
+	// 切换到逆解模式, 关联逆解
+	inverse_kinematics();
+
+	// *** 获取的摆焊参数 *************************************
+	// 摆动频率
+	float freq = waveCfg.Freq;
+	// 摆动振幅
+	float ampl = waveCfg.Width / 2;
+	// 焊接速度
+	float vel = 10.0;
+	// 停止模式
+	int holdType = waveCfg.Dwell_type;
+	// 机器人停留时间, 摆动停留时间 (仅一个生效)
+	float robotHoldTime = 0.0, swingHoldTime = 0.0;
+	// 机器人停止
+	if (holdType > 0) {
+		robotHoldTime = (waveCfg.Dwell_left + waveCfg.Dwell_right) / 2;
+	}
+	// 摆动停留时间
+	else {
+		swingHoldTime = (waveCfg.Dwell_left + waveCfg.Dwell_right) / 2;
+	}
+
+	// *** 计算摆焊参数 ***************************************
+	// 读取缓冲最终位置处的欧拉角(deg)
+	Eigen::Vector3f zEuler(0, 0, 0);
+	for (size_t i = 0; i < 3; ++i) {
+		ZAux_Direct_GetEndMoveBuffer(handle, poseAxisIdx[i], &zEuler[i]);
+	}
+	zEuler *= M_PI / 180;
+	// 缓冲最终位置的工具 Z 方向
+	Eigen::Vector3f zDir(0, 0, 0);
+	zDir[0] = sin(zEuler[2]) * sin(zEuler[0]) + cos(zEuler[2]) * cos(zEuler[0]) * sin(zEuler[1]);
+	zDir[1] = cos(zEuler[0]) * sin(zEuler[2]) * sin(zEuler[1]) - cos(zEuler[2]) * sin(zEuler[0]);
+	zDir[2] = cos(zEuler[0]) * cos(zEuler[1]);
+	// 读取脉冲当量
+	float units = 0.0;
+	ZAux_Direct_GetUnits(handle, toolAxisIdx[0], &units);
+
+	// TCP 点位移
+	Eigen::Vector3f displ = { moveCmd[0], moveCmd[1], moveCmd[2] };
+	// 直线轨迹的朝向
+	Eigen::Vector3f displDir = displ.normalized();
+	// 偏移方向
+	Eigen::Vector3f offDir = zDir.cross(displ).normalized();
+	// 波形反向
+	offDir *= waveCfg.Phase > 0 ? -1 : 1;
+	// 总位移(mm)
+	float dist = displ.norm();
+	// 总时间(s)
+	float totalTime = dist / vel;
+	// 周期数
+	size_t numPeriod = std::ceil(1000 * totalTime / (1000 / freq + 2 * swingHoldTime));
+
+	// *** 设置插补矢量轴 *************************************
+	// 等待摆动标志位置位
+	ZAux_Direct_MoveWait(handle, connpathAxisIdx, (char*)"TABLE", swingFlagIdx, 1, 0);
+	// 使用插补矢量长度轴作为凸轮轴的跟随主轴，记录主轴的矢量运动距离，不受叠加轴影响
+	ZAux_Direct_Connpath(handle, 1, toolAxisIdx[0], connpathAxisIdx);
+
+	// *** 设置凸轮虚拟轴 *************************************
+	for (size_t i = 0; i < camAxisIdx.size(); ++i) {
+		// 等待摆动标志位置位
+		ZAux_Direct_MoveWait(handle, camAxisIdx[i], (char*)"TABLE", swingFlagIdx, 1, 0);
+		// 凸轮轴运动叠加到真实工具轴上
+		ZAux_Direct_Single_Addax(handle, toolAxisIdx[i], camAxisIdx[i]);
+		// 绑定跟随凸轮表
+		ZAux_Direct_Cambox(handle, camAxisIdx[i], sinTableBeg, sinTableBeg + numInterp - 1, ampl * units * offDir[i], dist / numPeriod, connpathAxisIdx, 4, 0);
+	}
+
+	// *** 设置运动主轴 *************************************
+	// 设置主轴速度
+	for (size_t i = 0; i < toolAxisIdx.size(); ++i) {
+		ZAux_Direct_SetSpeed(handle, toolAxisIdx[i], vel);
+	}
+	// 设置附加轴不参与速度计算
+	for (size_t i = 3; i < toolAxisIdx.size(); ++i) {
+		ZAux_Direct_SetInterpFactor(handle, toolAxisIdx[i], 0);
+	}
+
+	// 停止凸轮轴运动
+	for (size_t i = 0; i < camAxisIdx.size(); ++i) {
+		ZAux_Direct_MoveCancel(handle, toolAxisIdx[0], camAxisIdx[i], 0);
+	}
+	// 插补矢量轴位置清零
+	ZAux_Direct_MovePara(handle, toolAxisIdx[0], (char*)"DPOS", connpathAxisIdx, 0);
+	for (size_t i = 0; i < camAxisIdx.size(); ++i) {
+		// 凸轮轴位置清零
+		ZAux_Direct_MovePara(handle, toolAxisIdx[0], (char*)"DPOS", camAxisIdx[i], 0);
+	}
+
+	// 偏移方向和深度方向写入 Table
+	for (size_t i = 0; i < 3; ++i) {
+		ZAux_Direct_MoveTable(handle_, toolAxisIdx_[0], 1004 + i, offDir[i]);
+		ZAux_Direct_MoveTable(handle_, toolAxisIdx_[0], 1007 + i, zDir[i]);
+	}
+
+	// 四分之一摆动周期占用的 table 个数
+	size_t numQuarter = numInterp * (1000 / freq) / (1000 / freq + 2 * swingHoldTime) / 4;
+	// 右停留时间占用的 table 个数
+	size_t numRightHold = (numInterp - 4 * numQuarter) / 2;
+	// 缓冲中写入凸轮表
+	for (size_t i = 0; i < 4 * numQuarter; ++i) {
+		// 插值点对应的偏移幅值
+		float tmp = std::sin(2 * M_PI * i / (4 * numQuarter - 1));
+		if (i < numQuarter) {
+			ZAux_Direct_MoveTable(handle, toolAxisIdx[0], sinTableBeg + i, tmp);
+		}
+		else if (i < 3 * numQuarter) {
+			ZAux_Direct_MoveTable(handle, toolAxisIdx[0], sinTableBeg + numRightHold + i, tmp);
+		}
+		else {
+			size_t tmpIdx = sinTableBeg + numInterp - 4*numQuarter + i;
+			ZAux_Direct_MoveTable(handle, toolAxisIdx[0], sinTableBeg + numInterp - 4*numQuarter + i, tmp);
+		}
+	}
+	for (size_t i = 0; i < numRightHold; ++i) {
+		ZAux_Direct_MoveTable(handle, toolAxisIdx[0], sinTableBeg + numQuarter + i, 1);
+	}
+	for (size_t i = 0; i < numInterp - 4 * numQuarter - numRightHold; ++i) {
+		ZAux_Direct_MoveTable(handle, toolAxisIdx[0], sinTableBeg + 3*numQuarter + numRightHold + i, -1);
+	}
+
+	// 主轴缓冲中将摆动标志位置位，摆动开始
+	ZAux_Direct_MoveTable(handle, toolAxisIdx[0], swingFlagIdx, 1);
+
+	// 开始运动指令
+	std::vector<float> cmd = { moveCmd[0] / numPeriod / 4, moveCmd[1] / numPeriod / 4, moveCmd[2] / numPeriod / 4, moveCmd[3] / numPeriod / 4 };
+
+	// 1/4 周期
+	ZAux_Direct_Move(handle, toolAxisIdx.size(), toolAxisIdx.data(), cmd.data());
+	if (robotHoldTime > 0)
+		ZAux_Direct_MoveDelay(handle, toolAxisIdx[0], robotHoldTime);
+	
+	for (size_t i = 0; i < cmd.size(); ++i) cmd[i] *= 2;
+	for (size_t i = 0; i < numPeriod - 1; ++i) {
+		// 开始采集电流电压
+		ZAux_Direct_MoveTable(handle, toolAxisIdx[0], 1001, 1);
+		ZAux_Direct_Move(handle, toolAxisIdx.size(), toolAxisIdx.data(), cmd.data());
+		if (robotHoldTime > 0)
+			ZAux_Direct_MoveDelay(handle, toolAxisIdx[0], robotHoldTime);
+		ZAux_Direct_Move(handle, toolAxisIdx.size(), toolAxisIdx.data(), cmd.data());
+		if (robotHoldTime > 0)
+			ZAux_Direct_MoveDelay(handle, toolAxisIdx[0], robotHoldTime);
+	}
+
+	ZAux_Direct_Move(handle, toolAxisIdx.size(), toolAxisIdx.data(), cmd.data());
+	if (robotHoldTime > 0)
+		ZAux_Direct_MoveDelay(handle, toolAxisIdx[0], robotHoldTime);
+
+	for (size_t i = 0; i < cmd.size(); ++i) cmd[i] /= 2;
+	ZAux_Direct_Move(handle, toolAxisIdx.size(), toolAxisIdx.data(), cmd.data());
+
+	// 摆动标志位复位
+	ZAux_Direct_MoveTable(handle, toolAxisIdx[0], swingFlagIdx, -1);
+
+	// 摆动结束
+	// 停止凸轮轴运动
+	for (size_t i = 0; i < camAxisIdx.size(); ++i) {
+		ZAux_Direct_MoveCancel(handle, toolAxisIdx[0], camAxisIdx[i], 0);
+	}
+	// 插补矢量轴取消绑定
+	ZAux_Direct_MoveCancel(handle, toolAxisIdx[0], connpathAxisIdx, 0);
+
+	// 附加轴恢复计算插补速度
+	for (size_t i = 3; i < toolAxisIdx.size(); ++i) {
+		ZAux_Direct_SetInterpFactor(handle, toolAxisIdx[i], 1);
+	}
+
+	return 0;
+}
+uint8_t ZauxRobot::swingL_(const std::vector<float>& moveCmd) {
+	// 句柄号
+	ZMC_HANDLE handle = handle_;
+	// TCP 位置轴号 + 附加轴轴号
+	std::vector<int> toolAxisIdx = { toolAxisIdx_[0],toolAxisIdx_[1],toolAxisIdx_[2],toolAxisIdx_[3] };
+	// TCP 姿态轴号
+	std::vector<int> poseAxisIdx = { ikAxisIdx_[3], ikAxisIdx_[4], ikAxisIdx_[5] };
+	// 凸轮轴轴号
 	std::vector<int> camAxisIdx = { camAxisIdx_[0], camAxisIdx_ [1], camAxisIdx_[2] };
 	// 跟随矢量轴轴号
 	int connpathAxisIdx = 15;

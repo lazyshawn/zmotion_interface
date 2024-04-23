@@ -121,6 +121,7 @@ public:
 	*/
 	uint8_t swingL(const std::vector<float>& moveCmd, Eigen::Vector3f upper);
 	uint8_t swingL(const std::vector<float>& moveCmd);
+	uint8_t swingL_(const std::vector<float>& moveCmd);
 	uint8_t swingLAbs(const std::vector<float>& moveCmd);
 
 	/**
