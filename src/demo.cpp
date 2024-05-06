@@ -47,8 +47,8 @@ int main() {
 	//robot.swingC({1467.749, -2.06, 163.68}, {1267.749, -2.06, 363.68});
 	////robot.swingL({ -200, 0, 0, 200 }, {0,0,1});
 
-	test_swing();
-	//test_zswing();
+	//test_swing();
+	test_zswing();
 
 	//// 断开连接
 	//robot.disconnect();
@@ -56,28 +56,48 @@ int main() {
 }
 
 void test_zswing() {
+	//robot.test();
+
 	robot.waveCfg.Freq = 1;
-	robot.waveCfg.Width = 20;
+	robot.waveCfg.Width = 5;
 	robot.waveCfg.Dwell_left = 1000;
 	robot.waveCfg.Dwell_right = 1000;
+	robot.waveCfg.Dwell_type = 0;
 
-	int ret = 0;
-	robot.moveJ({ -1.8055, 7.2945, 24.1143, -2.5585, 69.5887, 5.4886, 0.0 });
+	//robot.inverse_kinematics();
+
+	//robot.swing_on();
+
+	robot.discreteTrajectory.set_starting_point({ 1000, -200, 200, -179.9990, -28.8890, -135, 0 });
+	robot.discreteTrajectory.add_line({ 1000, 200, 200, 179.9990, -28.8890, 135, 0.0 });
+	robot.discreteTrajectory.add_line({ 1400, 200, 200, 179.9990, -28.8900, 45, 0.0 });
+
+	robot.discreteTrajectory.corner_transition(50, 50);
+
+	robot.execute_discrete_trajectory();
+
+	//robot.swing_off();
+
+	//int ret = 0;
+	//robot.moveJ({ -1.8055, 7.2945, 24.1143, -2.5585, 69.5887, 5.4886, 0.0 });
 
 
-	//ZAux_Direct_MovePara(robot.handle_, 0, "VECTOR_MOVED", robot.toolAxisIdx_[0], 0);
+	////ZAux_Direct_MovePara(robot.handle_, 0, "VECTOR_MOVED", robot.toolAxisIdx_[0], 0);
 
-	robot.wait_idle(0);
-	std::this_thread::sleep_for(std::chrono::seconds(2));
+	//robot.wait_idle(0);
+	//std::this_thread::sleep_for(std::chrono::seconds(2));
 
-	ret += robot.swing_on();
-	//robot.moveL();
-	// 获取当前位置
+	//ret += robot.swing_on();
+	////robot.moveL();
+	//// 获取当前位置
 
-	robot.zswingC({ 1467.749, 200.06, 163.68 }, { 1267.749, -200.06, 663.68 });
-	ret += robot.swing_off();
+	//robot.moveL({ -100, 0, 0, 0 });
+	//robot.moveL({ 0, 88, 0, 0 });
+	////robot.zswingC({ 1467.749, 200.06, 163.68 }, { 1267.749, -200.06, 663.68 });
+	////robot.zswingC({ 1034.4090, -118.5060, 78.8420 }, { 1034.4090, -18.5060, 78.8420 });
+	//ret += robot.swing_off();
 
-	//robot.moveL();
+	////robot.moveL();
 
 }
 
@@ -88,22 +108,22 @@ void test_swing() {
 	robot.waveCfg.Dwell_right = 1000;
 	robot.waveCfg.Dwell_type = 0;
 	
-	robot.moveJ({ -1.8055, 7.2945, 24.1143, -2.5585, 69.5887, 5.4886, 0.0 });
-	robot.swingL({ 0, -100, 0, 0 });
+	//robot.moveJ({ -1.8055, 7.2945, 24.1143, -2.5585, 69.5887, 5.4886, 0.0 });
+	//robot.swingL({ 0, -100, 0, 0 });
 	//robot.swingL({ 0, -100, 0, 0 });
 
 	//robot.moveJ({ 0, -6.8221, 14.3160, -0.0000, 55.1156, 30, 0 });
 	//robot.swingC_({ 1034.4090, -118.5060, 78.8420 }, { 1034.4090, -18.5060, 78.8420 });
 	//robot.swingC({ 1467.749, 200.06, 163.68 }, { 1267.749, -200.06, 663.68 });
 
-	//robot.moveJ({ -15.9641, 33.5979, 3.9740, 16.2066, 76.0944, 31.1940, 0.0 });
+	robot.moveJ({ -15.9641, 33.5979, 3.9740, 16.2066, 76.0944, 31.1940, 0.0 });
 	//robot.wait_idle(0);
 	//std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 	//std::cout << "Begin" << std::endl;
 	////robot.wlder_on(240, 30);
 	//std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
-	//robot.swingC({ 1244.7410, -44.3710, -73.6200, -201.6840, -40.8120, 227.0230 }, { 1265.5150, -90.9640, -73.2900, -177.6410, -41.2930, 175.6090 });
+	robot.swingC({ 1244.7410, -44.3710, -73.6200, -201.6840, -40.8120, 227.0230 }, { 1265.5150, -90.9640, -73.2900, -177.6410, -41.2930, 175.6090 });
 	////robot.swingC({ 1244.7410, -44.3710, -73.6200 }, { 1265.5150, -90.9640, -73.2900 });
 
 	robot.wait_idle(20);

@@ -9,6 +9,7 @@
 #include "zauxdll2.h"
 
 #include"FsCraftDef.h"
+#include "DiscreteTrajectory.h"
 
 #ifndef M_PI
 constexpr static double M_PI = 3.14159265358979323846;
@@ -64,6 +65,8 @@ public:
 	// °Úº¸²ÎÊý
 	Weave waveCfg;
 
+	DiscreteTrajectory<float, 7> discreteTrajectory;
+
 public:
 	ZauxRobot();
 	/**
@@ -106,7 +109,7 @@ public:
 	uint8_t swing_off();
 	uint8_t moveJ(const std::vector<float>& jntDPos);
 	uint8_t moveJ_single();
-	uint8_t moveL();
+	uint8_t moveL(const std::vector<float>& moveCmd);
 	uint8_t moveL_single();
 	uint8_t moveC(const std::vector<float>& endConfig, const std::vector<float>& midConfig);
 
@@ -133,6 +136,12 @@ public:
 	uint8_t swingC(const std::vector<float>& endConfig, const std::vector<float>& midConfig);
 	uint8_t zswingC(const std::vector<float>& endConfig, const std::vector<float>& midConfig);
 	uint8_t swingC_(const std::vector<float>& endConfig, const std::vector<float>& midConfig);
+
+	uint8_t test();
+
+	uint8_t execute_discrete_trajectory_abs();
+
+	uint8_t execute_discrete_trajectory();
 };
 
 Eigen::Vector3f triangular_circumcenter(Eigen::Vector3f beg, Eigen::Vector3f mid, Eigen::Vector3f end);
