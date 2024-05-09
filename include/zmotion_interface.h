@@ -21,7 +21,7 @@ class ZauxAxis {
 	// 读取已经下载到控制卡中的轴参数
 	//uint8_t load_uploaded_config();
 	// 加载轴参数
-	uint8_t download_config();
+	//uint8_t download_config();
 
 private:
 	// 轴类型
@@ -40,35 +40,33 @@ public:
 	ZMC_HANDLE handle_ = NULL;
 	// 工具轴与关节轴的关联模式
 	ConnType connType = ConnType::INIT;
+
 	// 关节轴
 	std::vector<int> jointAxisIdx_ = { 0,1,2,3,4,5 };
-	// 逆解轴
-	std::vector<int> ikAxisIdx_ = { 7,8,9,10,11,12 };
+	// 逆解位置轴
+	std::vector<int> ikPosAxisIdx_ = { 7,8,9 };
+	// TCP 姿态轴
+	std::vector<int> tcpAngleAxisIdx_ = { 10,11,12 };
+	// TCP 位置轴
+	std::vector<int> tcpPosAxisIdx_ = { 20, 21, 22 };
 	// 附加轴
 	std::vector<int> appAxisIdx_ = { 6 };
-	// 工具轴
-	std::vector<int> toolAxisIdx_ = { 20, 21, 22, 6 };
-	// 凸轮运动轴
+	// 凸轮轴
 	std::vector<int> camAxisIdx_ = { 23, 24, 25 };
-	// 和主轴进行相同的运动，作为凸轮跟随的参考轴
-	//std::vector<int> virtualAxisIdx = { 26, 27, 28, 29, 30, 31 };
-
-	// 左停留时间
-	int leftHoldT = 0;
-	// 右停留时间
-	int rightHoldT = 0;
-	// 回中停留时间
-	int midHoldT = 0;
+	// 插补矢量轴
+	int connpathAxisIdx_ = 15;
 
 	// 摆动标志位索引
 	size_t swingFlagIdx = 1000;
+
 	// 摆焊参数
 	Weave waveCfg;
-
+	// 连续轨迹处理
 	DiscreteTrajectory<float, 7> discreteTrajectory;
 
 public:
 	ZauxRobot();
+	ZauxRobot(ZMC_HANDLE handle, const std::vector<int>& jointAxisIdx_, const std::vector<int>& toolAxisIdx_);
 	/**
 	* @brief 通过网口连接控制器
 	*/
@@ -105,7 +103,7 @@ public:
 
 	uint8_t wait_idle(int axisIdx);
 
-	uint8_t swing_on();
+	uint8_t swing_on(float vel);
 	uint8_t swing_off();
 	uint8_t moveJ(const std::vector<float>& jntDPos);
 	uint8_t moveJ_single();
@@ -122,7 +120,6 @@ public:
 	* @param moveCmd    位移指令，前三个元素为 TCP 点位移，后续元素为附加轴位移
 	* @param upper      运动平面的上方向
 	*/
-	uint8_t swingL(const std::vector<float>& moveCmd, Eigen::Vector3f upper);
 	uint8_t swingL(const std::vector<float>& moveCmd);
 	uint8_t swingL_(const std::vector<float>& moveCmd);
 	uint8_t swingLAbs(const std::vector<float>& moveCmd);
@@ -142,6 +139,11 @@ public:
 	uint8_t execute_discrete_trajectory_abs();
 
 	uint8_t execute_discrete_trajectory();
+
+	uint8_t swing_tri();
+
+	uint8_t swing_trajectory();
+
 };
 
 Eigen::Vector3f triangular_circumcenter(Eigen::Vector3f beg, Eigen::Vector3f mid, Eigen::Vector3f end);

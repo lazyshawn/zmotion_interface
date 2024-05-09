@@ -6,6 +6,7 @@
 
 #include<iostream>
 
+
 template <typename T = float, size_t N = 6>
 class DiscreteTrajectory {
 public:
@@ -77,7 +78,6 @@ public:
 	* @brief  记录圆弧轨迹
 	* @param  end    圆弧终点
 	* @param  mid    圆弧中间点
-	* @todo   法向量计算
 	*/
 	uint8_t add_arc(const std::vector<T>& end, const std::vector<T>& mid) {
 		if (nodePoint.size() < 1) return 1;
@@ -150,26 +150,23 @@ public:
 		Eigen::Matrix<T, N, 1> prePnt = (*begPntIte++);
 		std::cout << "curPnt = " << prePnt.transpose() << std::endl;
 
+		Eigen::Matrix<T, 3, 1> begEuler(prePnt[3], prePnt[4], prePnt[5]), endEuler = (*begPntIte).segment<3>(3);
+
 		while (begPntIte != nodePoint.end()) {
 			// 当前位姿
 			Eigen::Matrix<T, N, 1> curPnt = (*begPntIte++);
 			std::cout << "curPnt = " << curPnt.transpose() << std::endl;
-			// 位置相对值
-			std::cout << curPnt[0]-prePnt[0] << ", " << curPnt[1] - prePnt[1] << ", " << curPnt[2] - prePnt[2] << ", ";
+			std::cout << curPnt[0] - prePnt[0] << ", " << curPnt[1] - prePnt[1] << ", " << curPnt[2] - prePnt[2] << ", ";
+			endEuler = curPnt.segment<3>(3);
 			// 欧拉角相对值
-			Eigen::Matrix<T, 3, 1> begEuler(prePnt[3], prePnt[4], prePnt[5]), endEuler(curPnt[3], curPnt[4], curPnt[5]);
 			Eigen::Matrix<T, 3, 1> relEuler = get_zyx_euler_distance(begEuler, endEuler);
 			for (size_t i = 0; i < 3; ++i) {
 				std::cout << relEuler[i] << ", ";
 			}
+			begEuler = endEuler;
 
 			prePnt = curPnt;
 			std::cout << "\n" << std::endl;
-
-			// 绝对值
-			//std::cout << (*begPntIte)[0] << ", " << (*begPntIte)[1] << ", " << (*begPntIte)[2] << ", ";
-			//std::cout << (*begPntIte)[3] << ", " << (*begPntIte)[4] << ", " << (*begPntIte)[5] << std::endl;
-			//begPntIte++;
 		}
 	}
 
@@ -208,8 +205,8 @@ public:
 		T pitchAngle = std::acos(dotProd);
 		pitchAngle *= (begUprightDir_end.cross(endUprightDir).dot(endTan) < 0) ? -1 : 1;
 
-		std::cout << "\n===========>\nbegMat = \n" << begMat << std::endl;
-		std::cout << "endMat = \n" << endMat << std::endl;
+		std::cout << "\n===========\nbegMat = \n" << begMat << std::endl;
+		std::cout << "endMat = \n" << endMat << "\n===========\n" << std::endl;
 		for (size_t i = 0; i < distList.size(); ++i) {
 			
 			// 过渡点
@@ -222,16 +219,16 @@ public:
 			// 从起点算起
 			if (distList[i] > 0) {
 
-				std::cout << "\nNodeMat = \n" << begMat << std::endl;
-				std::cout << "NodePnt = " << begPnt.transpose() << std::endl;
+				//std::cout << "\nNodeMat = \n" << begMat << std::endl;
+				//std::cout << "NodePnt = " << begPnt.transpose() << std::endl;
 
 				T inDist = distList[i];
 				// 推拉角纠正: 绕法线方向, 默认小角度变化
-				dotProd = begMat.col(2).dot(begUprightDir);
-				dotProd = std::fabs(dotProd) > 1 ? (dotProd / std::fabs(dotProd)) : dotProd;
-				T thrustAngle = std::acos(dotProd);
-				thrustAngle *= begMat.col(2).cross(begUprightDir).dot(begNorm) < 0 ? -1 : 1;
-				transMat = Eigen::AngleAxis<T>(pitchAngle * inDist / std::fabs(info(3)), begTan) * Eigen::AngleAxis<T>(thrustAngle, begNorm) * begMat;
+				transMat.col(2) = begUprightDir;
+				transMat.col(1) = begMat.col(1).dot(begTan) >= 0 ? begTan : -begTan;
+				transMat.col(0) = (transMat.col(1).cross(transMat.col(2))).normalized();
+				// 俯仰角修正
+				transMat = (Eigen::AngleAxis<T>(pitchAngle * inDist / std::fabs(info(3)), begTan) * transMat).eval();
 
 				// 直线
 				if (info(3) < 0) {
@@ -250,11 +247,11 @@ public:
 				T outDist = -distList[i];
 
 				// 推拉角纠正: 绕法线方向, 默认小角度变化
-				dotProd = endMat.col(2).dot(endUprightDir);
-				dotProd = std::fabs(dotProd) > 1 ? (dotProd / std::fabs(dotProd)) : dotProd;
-				T thrustAngle = std::acos(dotProd);
-				thrustAngle *= endMat.col(2).cross(endUprightDir).dot(endNorm) < 0 ? -1 : 1;
-				transMat = Eigen::AngleAxis<T>(pitchAngle * outDist / std::fabs(info(3)), -endTan) * Eigen::AngleAxis<T>(thrustAngle, endNorm) * endMat;
+				transMat.col(2) = endUprightDir;
+				transMat.col(1) = endMat.col(1).dot(endTan) >= 0 ? endTan : -endTan;
+				transMat.col(0) = (transMat.col(1).cross(transMat.col(2))).normalized();
+				// 俯仰角修正
+				transMat = (Eigen::AngleAxis<T>(pitchAngle * outDist / std::fabs(info(3)), -endTan) * transMat).eval();
 
 				// 直线
 				if (info(3) < 0) {
@@ -269,15 +266,19 @@ public:
 				lambda = 1.0 - outDist / std::fabs(info(3));
 			}
 
-			//std::cout << "TransMat = \n" << transMat << std::endl;
+			if (i == 0 || i == 4) {
+				std::cout << "TransMat = \n" << transMat << std::endl;
+			}
 			// 过渡点欧拉角
-			transPnt.segment<3>(3) = transMat.eulerAngles(2, 1, 0).reverse() * 180 / M_PI;
+			transPnt.segment<3>(3) = transMat.eulerAngles(2, 1, 0).reverse() * 180 / DT_PI;
 			// 附加轴插补
 			for (size_t j = 6; j < N; ++j) {
 				transPnt[j] = begPnt[j] + (endPnt[j] - begPnt[j]) * lambda;
 			}
 			ans[i] = transPnt;
-			//std::cout << "transPnt = \n" << transPnt.transpose() << "\n" << std::endl;
+			if (i == 0 || i == 4) {
+				std::cout << "transPnt = \n" << transPnt.transpose() << "\n" << std::endl;
+			}
 		}
 
 		return ans;
@@ -286,7 +287,7 @@ public:
 private:
 	// 坐标轴单位向向量
 	static const Eigen::Matrix<T, 3, 1> unitX, unitY, unitZ;
-	static const T M_PI;
+	static const T DT_PI;
 
 	/**
 	* @brief  空间三点构建圆弧轨迹
@@ -322,12 +323,12 @@ private:
 		// 2,3 在 1 的两侧
 		if (n12.dot(n13) < 0) {
 			normal = -n13;
-			theta = 2 * M_PI - theta;
+			theta = 2 * DT_PI - theta;
 		}
 		// q12 > q13
 		else if (q12 > q13) {
 			normal = -n13;
-			theta = 2 * M_PI - theta;
+			theta = 2 * DT_PI - theta;
 		}
 		// q13 > q12
 		else if (q13 > q12) {
@@ -349,7 +350,7 @@ private:
 	* @param  qx    绕 x 转角(deg)
 	*/
 	Eigen::Matrix<T, 3, 3> RzyxToRotMat(T qz, T qy, T qx) {
-		return (Eigen::AngleAxis<T>(qz * M_PI / 180, unitZ) * Eigen::AngleAxis<T>(qy * M_PI / 180, unitY) * Eigen::AngleAxis<T>(qx * M_PI / 180, unitX)).matrix();
+		return (Eigen::AngleAxis<T>(qz * DT_PI / 180, unitZ) * Eigen::AngleAxis<T>(qy * DT_PI / 180, unitY) * Eigen::AngleAxis<T>(qx * DT_PI / 180, unitX)).matrix();
 	}
 
 	/**
@@ -359,12 +360,12 @@ private:
 	* @param  qz    绕 z 转角(deg)
 	*/
 	Eigen::Matrix<T, 3, 3> RxyzToRotMat(T qx, T qy, T qz) {
-		return (Eigen::AngleAxis<T>(qx * M_PI / 180, unitX) * Eigen::AngleAxis<T>(qy * M_PI / 180, unitY) * Eigen::AngleAxis<T>(qz * M_PI / 180, unitZ)).matrix();
+		return (Eigen::AngleAxis<T>(qx * DT_PI / 180, unitX) * Eigen::AngleAxis<T>(qy * DT_PI / 180, unitY) * Eigen::AngleAxis<T>(qz * DT_PI / 180, unitZ)).matrix();
 	}
 };
 
 template <typename T, size_t N>
-const T DiscreteTrajectory<T, N>::M_PI = 3.14159265358979323846;
+const T DiscreteTrajectory<T, N>::DT_PI = 3.14159265358979323846;
 // 坐标轴单位向向量
 template <typename T, size_t N>
 const Eigen::Matrix<T, 3, 1> DiscreteTrajectory<T, N>::unitX = Eigen::Matrix<T, 3, 1>(1, 0, 0);
@@ -381,7 +382,7 @@ const Eigen::Matrix<T, 3, 1> DiscreteTrajectory<T, N>::unitZ = Eigen::Matrix<T, 
 * @return 相对运动距离
 */
 template <typename T>
-Eigen::Matrix<T, 3, 1> get_zyx_euler_distance(Eigen::Matrix<T, 3, 1> begEuler, Eigen::Matrix<T, 3, 1> endEuler, bool chooseMimumDist = 1) {
+Eigen::Matrix<T, 3, 1> get_zyx_euler_distance(Eigen::Matrix<T, 3, 1>& begEuler, Eigen::Matrix<T, 3, 1>& endEuler, bool chooseMimumDist = 1) {
 	Eigen::Matrix<T, 3, 1> ans(0, 0, 0);
 
 	// wrap to (-pi, pi]
@@ -395,21 +396,15 @@ Eigen::Matrix<T, 3, 1> get_zyx_euler_distance(Eigen::Matrix<T, 3, 1> begEuler, E
 	}
 
 	// equivalent of endEuler
-	Eigen::Matrix<T, 3, 1> equivEuler = endEuler;
+	Eigen::Matrix<T, 3, 1> equivEuler = get_equivalent_zyx_euler(endEuler);
 	if (endEuler[1] == 90) {
-		T detQ = endEuler[2] - endEuler[0];
-		equivEuler[0] = (detQ > 0) ? (std::min)(begEuler[0], begEuler[2]) : (std::max)(begEuler[0], begEuler[2]);
-		equivEuler[2] = equivEuler[0] + detQ;
+		equivEuler[0] = (equivEuler[2] > 0) ? (std::min)(begEuler[0], begEuler[2]) : (std::max)(begEuler[0], begEuler[2]);
+		equivEuler[2] += equivEuler[0];
 	}
 	else if (endEuler[1] == -90) {
 		T sumQ = endEuler[2] + endEuler[0];
 		equivEuler[0] = begEuler[0];
-		equivEuler[2] = sumQ - equivEuler[0];
-	}
-	else {
-		equivEuler[0] = endEuler[0] + 180;
-		equivEuler[1] = 180 - endEuler[1];
-		equivEuler[2] = endEuler[2] + 180;
+		equivEuler[2] -= equivEuler[0];
 	}
 	// wrap to (-pi, pi]
 	for (size_t i = 0; i < 3; ++i) {
@@ -445,10 +440,24 @@ Eigen::Matrix<T, 3, 1> get_zyx_euler_distance(Eigen::Matrix<T, 3, 1> begEuler, E
 
 	// 选择最短 / 最长的相对运动距离
 	if (chooseMimumDist) {
-		ans = endSum < equivSum ? endRel : equivRel;
+		//ans = endSum < equivSum ? endRel : equivRel;
+		if (endSum < equivSum) {
+			ans = endRel;
+		}
+		else {
+			ans = equivRel;
+			endEuler = equivEuler;
+		}
 	}
 	else {
-		ans = ans = endSum < equivSum ? equivRel : endRel;
+		//ans = endSum < equivSum ? equivRel : endRel;
+		if (endSum > equivSum) {
+			ans = endRel;
+		}
+		else {
+			ans = equivRel;
+			endEuler = equivEuler;
+		}
 	}
 
 	//std::cout << "begEuler = " << begEuler.transpose() << std::endl;
@@ -456,4 +465,43 @@ Eigen::Matrix<T, 3, 1> get_zyx_euler_distance(Eigen::Matrix<T, 3, 1> begEuler, E
 	//std::cout << "equEuler = " << equivEuler.transpose() << "  -> " << equivRel.transpose() << " | sum = " << equivSum << std::endl;
 	//std::cout << "return: " << ans.transpose() << std::endl;
 	return ans;
+}
+
+/**
+* @brief  计算等效的 Rzyx 欧拉角
+* @param  endEuler    给定欧拉角 <Rx, Ry, Rz>
+* @return 等效的 Rzyx 欧拉角
+*/
+template <typename T>
+Eigen::Matrix<T, 3, 1> get_equivalent_zyx_euler(const Eigen::Matrix<T, 3, 1>& endEuler) {
+
+	Eigen::Matrix<T, 3, 1> equivEuler = endEuler;
+
+	while (std::fabs(equivEuler[1]) - 180 > 0) {
+		equivEuler[1] += equivEuler[1] > 0 ? -360 : 360;
+	}
+
+	// Ry == 90
+	if (endEuler[1] == 90) {
+		equivEuler[0] = 0;
+		equivEuler[2] = endEuler[2] - endEuler[0];
+	}
+	// Ry == -90
+	else if (endEuler[1] == -90) {
+		equivEuler[0] = 0;
+		equivEuler[2] = endEuler[2] + endEuler[0];
+	}
+	else {
+		equivEuler[0] = endEuler[0] + 180;
+		equivEuler[1] = 180 - endEuler[1];
+		equivEuler[2] = endEuler[2] + 180;
+	}
+	// wrap to (-pi, pi]
+	for (size_t i = 0; i < 3; ++i) {
+		while (std::fabs(equivEuler[i]) - 180 > 0) {
+			equivEuler[i] += equivEuler[i] > 0 ? -360 : 360;
+		}
+	}
+
+	return equivEuler;
 }

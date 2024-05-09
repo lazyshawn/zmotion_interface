@@ -5,21 +5,18 @@
 
 #include"zmotion_interface.h"
 
-int test();
-void commandCheckHandler(const char *command, int ret) {
-	// 非 0则失败
-	if (ret) {
-		printf("%s return code is %d\n", command, ret);
-	}
-}
 
 ZauxRobot robot;
 
-void test_dec_to_hex();
-void test_hex_to_dec(uint16_t high, uint16_t low);
-void format_float(std::string ifname, std::string ofname);
-void test_swing();
-void test_zswing();
+namespace shawn_test {
+	int test();
+	void test_dec_to_hex();
+	void test_hex_to_dec(uint16_t high, uint16_t low);
+	void format_float(std::string ifname, std::string ofname);
+	void test_swing();
+	void test_zswing();
+}
+using namespace shawn_test;
 
 int main() {
 	//format_float("C:\\Users\\15874\\Desktop\\SD0.BIN", "C:\\Users\\15874\\Desktop\\SD0.txt");
@@ -55,29 +52,44 @@ int main() {
 	return 0;
 }
 
-void test_zswing() {
+void shawn_test::test_zswing() {
 	//robot.test();
 
 	robot.waveCfg.Freq = 1;
 	robot.waveCfg.Width = 5;
-	robot.waveCfg.Dwell_left = 1000;
-	robot.waveCfg.Dwell_right = 1000;
-	robot.waveCfg.Dwell_type = 0;
+	robot.waveCfg.Dwell_left = 100;
+	robot.waveCfg.Dwell_right = 100;
+	robot.waveCfg.Dwell_type = 1;
 
 	//robot.inverse_kinematics();
 
-	//robot.swing_on();
-
-	robot.discreteTrajectory.set_starting_point({ 1000, -200, 200, -179.9990, -28.8890, -135, 0 });
+	/* ****  **** */
+	// base(0,1,2,3,4,5) moveabs(-10.9961, -11.7299, 34.4224, 0, 67.3076, -55.9961)
+	robot.discreteTrajectory.set_starting_point({ 1000, -200, 200, 179.9990, -28.8890, -135, 0 });
 	robot.discreteTrajectory.add_line({ 1000, 200, 200, 179.9990, -28.8890, 135, 0.0 });
-	robot.discreteTrajectory.add_line({ 1400, 200, 200, 179.9990, -28.8900, 45, 0.0 });
+	//robot.discreteTrajectory.add_line({ 1400, 200, 200, 179.9990, -28.8900, 45, 0.0 });
 
-	robot.discreteTrajectory.corner_transition(50, 50);
+	robot.swing_trajectory();
 
-	robot.execute_discrete_trajectory();
+	//robot.discreteTrajectory.set_starting_point({ 1015.1998, -100.0001, 139.4812, 177.8830, -31.1151, -139.9815, 0 });
+	//robot.discreteTrajectory.add_line({ 1013.0623, 99.9997, 139.5929, -177.4258, -30.7125, 128.5668, 0.0 });
+	////robot.discreteTrajectory.add_line({ 1200.0044, 102.7630, 139.2698, -177.3642, -27.1874, 53.1885, 0.0 });
+
+	//robot.discreteTrajectory.corner_transition(50, 50);
+
+
+	//robot.swing_on();
+	//
+	//robot.execute_discrete_trajectory();
 
 	//robot.swing_off();
 
+	/* ****  **** */
+	//robot.swing_tri();
+
+
+
+	/* ****  **** */
 	//int ret = 0;
 	//robot.moveJ({ -1.8055, 7.2945, 24.1143, -2.5585, 69.5887, 5.4886, 0.0 });
 
@@ -101,7 +113,7 @@ void test_zswing() {
 
 }
 
-void test_swing() {
+void shawn_test::test_swing() {
 	robot.waveCfg.Freq = 1;
 	robot.waveCfg.Width = 5;
 	robot.waveCfg.Dwell_left = 1000;
@@ -109,25 +121,25 @@ void test_swing() {
 	robot.waveCfg.Dwell_type = 0;
 	
 	//robot.moveJ({ -1.8055, 7.2945, 24.1143, -2.5585, 69.5887, 5.4886, 0.0 });
-	//robot.swingL({ 0, -100, 0, 0 });
+	robot.swingL({ 0, -100, 0, 0 });
 	//robot.swingL({ 0, -100, 0, 0 });
 
 	//robot.moveJ({ 0, -6.8221, 14.3160, -0.0000, 55.1156, 30, 0 });
 	//robot.swingC_({ 1034.4090, -118.5060, 78.8420 }, { 1034.4090, -18.5060, 78.8420 });
 	//robot.swingC({ 1467.749, 200.06, 163.68 }, { 1267.749, -200.06, 663.68 });
 
-	robot.moveJ({ -15.9641, 33.5979, 3.9740, 16.2066, 76.0944, 31.1940, 0.0 });
+	//robot.moveJ({ -15.9641, 33.5979, 3.9740, 16.2066, 76.0944, 31.1940, 0.0 });
 	//robot.wait_idle(0);
 	//std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 	//std::cout << "Begin" << std::endl;
 	////robot.wlder_on(240, 30);
 	//std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
-	robot.swingC({ 1244.7410, -44.3710, -73.6200, -201.6840, -40.8120, 227.0230 }, { 1265.5150, -90.9640, -73.2900, -177.6410, -41.2930, 175.6090 });
+	//robot.swingC({ 1244.7410, -44.3710, -73.6200, -201.6840, -40.8120, 227.0230 }, { 1265.5150, -90.9640, -73.2900, -177.6410, -41.2930, 175.6090 });
 	////robot.swingC({ 1244.7410, -44.3710, -73.6200 }, { 1265.5150, -90.9640, -73.2900 });
 
-	robot.wait_idle(20);
-	std::cout << "End" << std::endl;
+	//robot.wait_idle(20);
+	//std::cout << "End" << std::endl;
 	//robot.wlder_off();
 
 	//robot.inverse_kinematics();
@@ -136,7 +148,7 @@ void test_swing() {
 	//robot.swingC({ 884.4090, -68.5060, 78.8420 }, { 934.4090, -18.5060, 78.8420 });
 }
 
-void format_float(std::string ifname, std::string ofname) {
+void shawn_test::format_float(std::string ifname, std::string ofname) {
 	std::ifstream in(ifname, std::ios::binary);
 	std::ofstream out(ofname, std::ios::trunc);
 	if (!in.is_open() || !out.is_open()) {
@@ -162,7 +174,7 @@ void format_float(std::string ifname, std::string ofname) {
 	in.close();
 }
 
-void test_dec_to_hex() {
+void shawn_test::test_dec_to_hex() {
 	int dec = 65533;
 	uint16_t bin = dec;
 	// 低八位
@@ -173,7 +185,7 @@ void test_dec_to_hex() {
 	printf("low = %d\n", low);
 }
 
-void test_hex_to_dec(uint16_t high, uint16_t low) {
+void shawn_test::test_hex_to_dec(uint16_t high, uint16_t low) {
 	//uint16_t high = 12;
 	//uint16_t low = 12;
 	uint16_t dec = (high << 8) + low;
@@ -183,7 +195,7 @@ void test_hex_to_dec(uint16_t high, uint16_t low) {
 	std::cout << dec * 1000 / 65535.0 << std::endl;
 }
 
-int test() {
+int shawn_test::test() {
 	std::cout << "hello world" << std::endl;
 	ZauxRobot robot;
 
@@ -226,7 +238,7 @@ int test() {
 	ZAux_Trigger(handle);
 
 	// 切换到逆解模式：每次执行工具坐标系运动时需要绑定一次，同步计算关节坐标变化
-	ZAux_Direct_Connframe(handle, robot.jointAxisIdx_.size(), robot.jointAxisIdx_.data(), 6, 0, robot.toolAxisIdx_.size(), robot.toolAxisIdx_.data());
+	//ZAux_Direct_Connframe(handle, robot.jointAxisIdx_.size(), robot.jointAxisIdx_.data(), 6, 0, robot.toolAxisIdx_.size(), robot.toolAxisIdx_.data());
 
 	// 参考轴 1 运动到 100 位置时，跟随轴 0启动凸轮表运动
 	/**
