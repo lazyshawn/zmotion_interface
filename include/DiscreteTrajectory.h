@@ -3,19 +3,20 @@
 #include<vector>
 #include<list>
 #include<eigen3/Eigen/Dense>
+#include<cmath>
 
 #include<iostream>
 
 
-template <typename T = float, size_t N = 6>
+template <typename T = float>
 class DiscreteTrajectory {
 public:
 	//! 轨迹端点 <位置, Rzyx(deg), 附加轴>
-	std::list<Eigen::Matrix<T, N, 1>> nodePoint;
+	std::list<std::vector<T>> nodePoint;
 	//! 轨迹中间点 <位置, Rzyx(deg), 附加轴>
-	std::list<Eigen::Matrix<T, N, 1>> midPoint;
+	std::list<std::vector<T>> midPoint;
 	//! 轨迹信息
-	std::list<Eigen::Matrix<T, 7, 1>> trajInfo;
+	std::list<std::vector<T>> trajInfo;
 
 public:
 	DiscreteTrajectory() {};
@@ -25,23 +26,18 @@ public:
 	* @brief  清除数据并重新记录起点
 	* @param  pnt    起点数据
 	*/
-	uint8_t set_starting_point(const std::vector<T>& pnt = std::vector<T>(0, N)) {
-		if (pnt.size() < N) return 2;
+	uint8_t set_starting_point(const std::vector<T>& pnt = {}) {
 
 		nodePoint.clear();
 		midPoint.clear();
 		trajInfo.clear();
 
-		Eigen::Matrix<T, N, 1> tmp;
-		for (size_t i = 0; i < N; ++i) {
-			tmp(i) = pnt[i];
-		}
-		nodePoint.push_back(tmp);
+		nodePoint.push_back(pnt);
 
 		return 0;
 	}
 
-	uint8_t reset_starting_point(const std::vector<T>& pnt = std::vector<T>(0, N)) {
+	uint8_t reset_starting_point(const std::vector<T>& pnt = {}) {
 		return 0;
 	}
 
@@ -49,28 +45,39 @@ public:
 	* @brief  记录直线轨迹
 	* @param  pnt    直线终点数据
 	*/
-	uint8_t add_line(const std::vector<T>& pnt) {
+	uint8_t add_line(const std::vector<T>& pnt, T vel = 10) {
 		if (nodePoint.size() < 1) return 1;
-		if (pnt.size() < N) return 2;
+
+		size_t N = nodePoint.front().size(), num = (std::min)(N, pnt.size());
 
 		// 添加轨迹点
-		Eigen::Matrix<T, N, 1> tmp, cur = nodePoint.back();
-		for (size_t i = 0; i < N; ++i) {
-			tmp(i) = pnt[i];
+		std::vector<T> tmp(N, 0), cur = nodePoint.back();
+		for (size_t i = 0; i < num; ++i) {
+			tmp[i] = pnt[i];
 		}
 		nodePoint.push_back(tmp);
 
-		midPoint.push_back((cur+tmp)/2);
+		// 添加中间点
+		for (size_t i = 0; i < N; ++i) {
+			tmp[i] = (cur[i] + tmp[i]) / 2;
+		}
+		midPoint.push_back(tmp);
 
 		// 计算轨迹信息
-		Eigen::Matrix<T, 7, 1> info = Eigen::Matrix<T, 7, 1>::Zero();
+		std::vector<T> info(8, 0);
 		Eigen::Matrix<T, 3, 1> curPos(cur[0], cur[1], cur[2]), endPos(pnt[0], pnt[1], pnt[2]);
-		info.head(3) = (endPos - curPos).normalized();
+
+		// 直线方向
+		Eigen::Matrix<T, 3, 1> dir = (endPos - curPos).normalized();
+		for (size_t i = 0; i < 3; ++i) {
+			info[i] = dir[i];
+		}
 		// 直线长度
-		info(3) = -1 * (endPos - curPos).norm();
+		info[3] = -1 * (endPos - curPos).norm();
+		// 轨迹速度
+		info[7] = vel;
 		trajInfo.push_back(info);
 		
-
 		return 0;
 	}
 
@@ -79,24 +86,35 @@ public:
 	* @param  end    圆弧终点
 	* @param  mid    圆弧中间点
 	*/
-	uint8_t add_arc(const std::vector<T>& end, const std::vector<T>& mid) {
+	uint8_t add_arc(const std::vector<T>& end, const std::vector<T>& mid, T vel = 10) {
 		if (nodePoint.size() < 1) return 1;
-		if (end.size() < N || mid.size() < N) return 2;
+		
+		size_t N = nodePoint.front().size(), num = (std::min)(N, end.size());
 
 		// 添加轨迹点
-		Eigen::Matrix<T, N, 1> tmp, cur = nodePoint.back();
-		for (size_t i = 0; i < N; ++i) {
-			tmp(i) = end[i];
+		std::vector<T> tmp(N, 0), cur = nodePoint.back();
+		for (size_t i = 0; i < num; ++i) {
+			tmp[i] = end[i];
 		}
 		nodePoint.push_back(tmp);
 
-		for (size_t i = 0; i < N; ++i) {
-			tmp(i) = mid[i];
+		// 添加中间点
+		tmp = std::vector<T>(N, 0);
+		for (size_t i = 0; i < num; ++i) {
+			tmp[i] = mid[i];
 		}
 		midPoint.push_back(tmp);
 
 		// 计算轨迹信息
-		Eigen::Matrix<T, 7, 1> info = construct_arc_trajectory(cur.head(3), midPoint.back().head(3), nodePoint.back().head(3));
+		Eigen::Matrix<T, 3, 1> begPnt(cur[0], cur[1], cur[2]), midPnt(mid[0], mid[1], mid[2]), endPnt(end[0], end[1], end[2]);
+		Eigen::Matrix<T, 7, 1> arcInfo = construct_arc_trajectory(begPnt, midPnt, endPnt);
+		std::vector<T> info(8);
+		// 轨迹形状
+		for (size_t i = 0; i < 7; ++i) {
+			info[i] = arcInfo[i];
+		}
+		// 轨迹速度
+		info[7] = vel;
 
 		trajInfo.push_back(info);
 
@@ -110,15 +128,17 @@ public:
 	*/
 	uint8_t corner_transition(T inDist = -1, T outDist = -1) {
 		if (nodePoint.size() < 1) return 1;
+
+		size_t N = nodePoint.front().size();
 		// N < 6 时不支持该函数
 		if (N < 6) return 2;
 
 		// 节点迭代器
-		std::list<Eigen::Matrix<T, N, 1>>::iterator endPntIte = nodePoint.begin(), begPntIte = endPntIte++;
+		auto endPntIte = nodePoint.begin(), begPntIte = endPntIte++;
 		// 中间点迭代器
-		std::list<Eigen::Matrix<T, N, 1>>::iterator midPntIte = midPoint.begin();
+		auto midPntIte = midPoint.begin();
 		// 轨迹信息迭代器
-		std::list<Eigen::Matrix<T, 7, 1>>::iterator infoIte = trajInfo.begin();
+		auto infoIte = trajInfo.begin();
 
 		while (infoIte != trajInfo.end()) {
 			std::vector< Eigen::Matrix<T, N, 1>> transPnt = transition_interpolate(*begPntIte, *endPntIte, *infoIte, { inDist, inDist/2, std::fabs((*infoIte)(3))/2, -outDist/2, -outDist });
@@ -178,18 +198,19 @@ public:
 	* @param  distList    过渡点距离数组, + 从起点计算; - 从终点计算
 	* @return 过渡点位置数组
 	*/
-	std::vector< Eigen::Matrix<T, N, 1>>
-	transition_interpolate(const Eigen::Matrix<T, N, 1>& begPnt, const Eigen::Matrix<T, N, 1>& endPnt, const Eigen::Matrix<T, 7, 1>& info, std::vector<T> distList) {
+	std::vector<std::vector<T>> transition_interpolate(const std::vector<T>& begPnt, const std::vector<T>& endPnt, const std::vector<T>& info, const std::vector<T>& distList) {
 		// 返回值
-		std::vector<Eigen::Matrix<T, N, 1>> ans(distList.size(), Eigen::Matrix<T, N, 1>::Zero());
+		std::vector<std::vector<T>> ans(distList.size(), std::vector<T>(begPnt.size(), 0));
 
 		// 起点处 TCP 姿态
 		Eigen::Matrix<T, 3, 3> begMat = RzyxToRotMat(begPnt[5], begPnt[4], begPnt[3]);
 		// 终点处 TCP 姿态
 		Eigen::Matrix<T, 3, 3> endMat = RzyxToRotMat(endPnt[5], endPnt[4], endPnt[3]);
 		// 切线方向
-		Eigen::Matrix<T, 3, 1> begTan = info(3) > 0 ? (info.tail<3>().cross(begPnt.head<3>() - info.head<3>())).normalized() : info.head<3>();
-		Eigen::Matrix<T, 3, 1> endTan = info(3) > 0 ? (info.tail<3>().cross(endPnt.head<3>() - info.head<3>())).normalized() : info.head<3>();
+		Eigen::Matrix<T, 3, 1> infoTail3(info[4], info[5], info[6]), infoHead3(info[0], info[1], info[2]);
+		Eigen::Matrix<T, 3, 1> begHead3(begPnt[0], begPnt[1], begPnt[2]), endHead3(endPnt[0], endPnt[1], endPnt[2]);
+		Eigen::Matrix<T, 3, 1> begTan = info[3] > 0 ? (infoTail3.cross(begHead3 - infoHead3)).normalized() : infoHead3;
+		Eigen::Matrix<T, 3, 1> endTan = info[3] > 0 ? (infoTail3.cross(endHead3 - infoHead3)).normalized() : infoHead3;
 		// 法线方向
 		Eigen::Matrix<T, 3, 1> begNorm = begTan.cross(begMat.col(2)).normalized();
 		Eigen::Matrix<T, 3, 1> endNorm = endTan.cross(endMat.col(2)).normalized();
@@ -197,7 +218,8 @@ public:
 		Eigen::Matrix<T, 3, 1> begUprightDir = begNorm.cross(begTan).normalized();
 		Eigen::Matrix<T, 3, 1> endUprightDir = endNorm.cross(endTan).normalized();
 		// 起点焊枪方向转换到终点
-		Eigen::Matrix<T, 3, 1> begUprightDir_end = info(3) > 0 ? (Eigen::AngleAxis<T>(info.tail(3).norm(), info.tail(3).normalized())*begUprightDir).eval() : begUprightDir;
+		// todo: Eigen::AngleAxis<T>(1, infoTail3)
+		Eigen::Matrix<T, 3, 1> begUprightDir_end = info[3] > 0 ? (Eigen::AngleAxis<T>(infoTail3.norm(), infoTail3.normalized())*begUprightDir).eval() : begUprightDir;
 
 		// 俯仰角变化: 绕切线方向, 默认小角度变化
 		T dotProd = begUprightDir_end.dot(endUprightDir);
@@ -210,7 +232,7 @@ public:
 		for (size_t i = 0; i < distList.size(); ++i) {
 			
 			// 过渡点
-			Eigen::Matrix<T, N, 1> transPnt = Eigen::Matrix<T, N, 1>::Zero();
+			std::vector<T> transPnt(begPnt.size(), 0);
 			// 过渡点姿态
 			Eigen::Matrix<T, 3, 3> transMat = Eigen::Matrix<T, 3, 3>::Identity();
 			// 过渡点距离占比
@@ -231,16 +253,22 @@ public:
 				transMat = (Eigen::AngleAxis<T>(pitchAngle * inDist / std::fabs(info(3)), begTan) * transMat).eval();
 
 				// 直线
-				if (info(3) < 0) {
-					transPnt.head(3) = begPnt.head(3) + begTan * inDist;
+				if (info[3] < 0) {
+					Eigen::Matrix<T, 3, 1> dir = begHead3 + begTan * inDist;
+					for (size_t i = 0; i < 3; ++i) {
+						transPnt[i] = dir[i];
+					}
 				}
 				// 圆弧
-				else if (info(3) > 0) {
-					transPnt.head(3) = info.head(3) + Eigen::AngleAxis<T>(inDist / std::fabs(info(3)), info.tail(3)) * (begPnt.head(3)-info.head(3));
-					transMat = (Eigen::AngleAxis<T>(inDist / std::fabs(info(3)), info.tail(3)) * transMat).eval();
+				else if (info[3] > 0) {
+					Eigen::Matrix<T, 3, 1> center = infoHead3 + Eigen::AngleAxis<T>(inDist / std::fabs(info[3]), infoTail3) * (begHad3 - infoHead3);
+					for (size_t i = 0; i < 3; ++i) {
+						transPnt[i] = dir[i];
+					}
+					transMat = (Eigen::AngleAxis<T>(inDist / std::fabs(info[3]), infoTail3) * transMat).eval();
 				}
 
-				lambda = inDist / std::fabs(info(3));
+				lambda = inDist / std::fabs(info[3]);
 			}
 			// 从终点算起
 			else if (distList[i] < 0) {
@@ -251,28 +279,37 @@ public:
 				transMat.col(1) = endMat.col(1).dot(endTan) >= 0 ? endTan : -endTan;
 				transMat.col(0) = (transMat.col(1).cross(transMat.col(2))).normalized();
 				// 俯仰角修正
-				transMat = (Eigen::AngleAxis<T>(pitchAngle * outDist / std::fabs(info(3)), -endTan) * transMat).eval();
+				transMat = (Eigen::AngleAxis<T>(pitchAngle * outDist / std::fabs(info[3]), -endTan) * transMat).eval();
 
 				// 直线
-				if (info(3) < 0) {
-					transPnt.head(3) = endPnt.head(3) - endTan * outDist;
+				if (info[3] < 0) {
+					Eigen::Matrix<T, 3, 1> dir = endHead3 - endTan * outDist;
+					for (size_t i = 0; i < 3; ++i) {
+						transPnt[i] = dir[i];
+					}
 				}
 				// 圆弧
-				else if (info(3) > 0) {
-					transPnt.head(3) = info.head(3) + Eigen::AngleAxis<T>(outDist / std::fabs(info(3)), -info.tail(3)) * (endPnt.head(3) - info.head(3));
-					transMat = (Eigen::AngleAxis<T>(outDist / std::fabs(info(3)), -info.tail(3)) * transMat).eval();
+				else if (info[3] > 0) {
+					Eigen::Matrix<T, 3, 1> center = infoHead3 + Eigen::AngleAxis<T>(outDist / std::fabs(info[3]), -infoTail3) * (endHead3 - infoHead3);
+					for (size_t i = 0; i < 3; ++i) {
+						transPnt[i] = dir[i];
+					}
+					transMat = (Eigen::AngleAxis<T>(outDist / std::fabs(info[3]), -infoTail3) * transMat).eval();
 				}
 
-				lambda = 1.0 - outDist / std::fabs(info(3));
+				lambda = 1.0 - outDist / std::fabs(info[3]);
 			}
 
 			if (i == 0 || i == 4) {
 				std::cout << "TransMat = \n" << transMat << std::endl;
 			}
 			// 过渡点欧拉角
-			transPnt.segment<3>(3) = transMat.eulerAngles(2, 1, 0).reverse() * 180 / DT_PI;
+			Eigen::Matrix<T, 3, 1> transEuler = transMat.eulerAngles(2, 1, 0).reverse() * 180 / DT_PI;
+			for (size_t j = 0; j < 3; ++j) {
+				transPnt[3 + j] = transEuler[j];
+			}
 			// 附加轴插补
-			for (size_t j = 6; j < N; ++j) {
+			for (size_t j = 6; j < begPnt.size(); ++j) {
 				transPnt[j] = begPnt[j] + (endPnt[j] - begPnt[j]) * lambda;
 			}
 			ans[i] = transPnt;
@@ -364,15 +401,15 @@ private:
 	}
 };
 
-template <typename T, size_t N>
-const T DiscreteTrajectory<T, N>::DT_PI = 3.14159265358979323846;
+template <typename T>
+const T DiscreteTrajectory<T>::DT_PI = 3.14159265358979323846;
 // 坐标轴单位向向量
-template <typename T, size_t N>
-const Eigen::Matrix<T, 3, 1> DiscreteTrajectory<T, N>::unitX = Eigen::Matrix<T, 3, 1>(1, 0, 0);
-template <typename T, size_t N>
-const Eigen::Matrix<T, 3, 1> DiscreteTrajectory<T, N>::unitY = Eigen::Matrix<T, 3, 1>(0, 1, 0);
-template <typename T, size_t N>
-const Eigen::Matrix<T, 3, 1> DiscreteTrajectory<T, N>::unitZ = Eigen::Matrix<T, 3, 1>(0, 0, 1);
+template <typename T>
+const Eigen::Matrix<T, 3, 1> DiscreteTrajectory<T>::unitX = Eigen::Matrix<T, 3, 1>(1, 0, 0);
+template <typename T>
+const Eigen::Matrix<T, 3, 1> DiscreteTrajectory<T>::unitY = Eigen::Matrix<T, 3, 1>(0, 1, 0);
+template <typename T>
+const Eigen::Matrix<T, 3, 1> DiscreteTrajectory<T>::unitZ = Eigen::Matrix<T, 3, 1>(0, 0, 1);
 
 /**
 * @brief  计算两组 Rzyx 欧拉角之间的相对运动距离
@@ -398,7 +435,7 @@ Eigen::Matrix<T, 3, 1> get_zyx_euler_distance(Eigen::Matrix<T, 3, 1>& begEuler, 
 	// equivalent of endEuler
 	Eigen::Matrix<T, 3, 1> equivEuler = get_equivalent_zyx_euler(endEuler);
 	if (endEuler[1] == 90) {
-		equivEuler[0] = (equivEuler[2] > 0) ? (std::min)(begEuler[0], begEuler[2]) : (std::max)(begEuler[0], begEuler[2]);
+		equivEuler[0] = (equivEuler[2] > 0) ? std::min(begEuler[0], begEuler[2]) : (std::max)(begEuler[0], begEuler[2]);
 		equivEuler[2] += equivEuler[0];
 	}
 	else if (endEuler[1] == -90) {

@@ -29,14 +29,6 @@ public:
 };
 
 
-
-
-
-
-
-
-
-
 class ReArc {
 public :
 
@@ -102,7 +94,6 @@ public:
 };
 
 
-
 //电弧跟踪参数
 class Track {
 public:
@@ -132,13 +123,14 @@ public:
 	double Ud_maxSingleCompensation = 3;	//上下单次最大补偿量
 	double Ud_minCompensation = 0;			//上下最小补偿量
 	double Ud_maxCompensation = 200;		//上下最大补偿量
-	int Ud_refSampleCount = 0;				//上下引用采样计数
-	int Ud_startTrackCount = 5;				//上下开始跟踪计数
+	int Ud_refSampleCount = 0;				//上下引用采样计数 | 基准电流采样周期数
+	int Ud_startTrackCount = 5;				//上下开始跟踪计数 | 开始跟踪周期数
 	double Ud_sampleFreq = 5;				//上下采样频率
 	double Ud_MaxCorrectAngle = 0.0;        //上下最大纠偏角度
 
 
 };
+
 
 //焊接参数
 class Arc_WeldingParaItem {
@@ -208,24 +200,6 @@ public:
 
 
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 //class Arc_WeldingParaItem {

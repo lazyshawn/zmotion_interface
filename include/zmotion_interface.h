@@ -4,6 +4,7 @@
 #include<eigen3/Eigen/Dense>
 #include<chrono>
 #include<thread>
+#include<fstream>
 
 #include "zmotion.h"
 #include "zauxdll2.h"
@@ -50,27 +51,34 @@ public:
 	// TCP 位置轴
 	std::vector<int> tcpPosAxisIdx_ = { 20, 21, 22 };
 	// 附加轴
-	std::vector<int> appAxisIdx_ = { 6 };
+	std::vector<int> appAxisIdx_ = { 6,30,31 };
 	// 凸轮轴
 	std::vector<int> camAxisIdx_ = { 23, 24, 25 };
 	// 插补矢量轴
-	int connpathAxisIdx_ = 15;
+	std::vector<int> connpathAxisIdx_ = { 15 };
 
 	// 摆动标志位索引
 	size_t swingFlagIdx = 1000;
 
+	// 脉冲当量
+	float axisUnits = 1;
+
 	// 摆焊参数
-	Weave waveCfg;
+	//Weave waveCfg;
 	// 连续轨迹处理
-	DiscreteTrajectory<float, 7> discreteTrajectory;
+	//DiscreteTrajectory<float> discreteTrajectory;
 
 public:
 	ZauxRobot();
-	ZauxRobot(ZMC_HANDLE handle, const std::vector<int>& jointAxisIdx_, const std::vector<int>& toolAxisIdx_);
+	ZauxRobot(const std::vector<int>& jointAxisIdx, const std::vector<int>& ikPosAxisIdx, const std::vector<int>& tcpAngleAxisIdx,
+		const std::vector<int>& tcpPosAxisIdx, const std::vector<int>& appAxisIdx, const std::vector<int>& camAxisIdx, const std::vector<int>& connpathAxisIdx
+	);
 	/**
 	* @brief 通过网口连接控制器
 	*/
-	uint8_t connect(char *ip_addr);
+	uint8_t connect_eth(char *ip_addr);
+	uint8_t connect_pci(uint32 cardNum);
+	uint8_t lazy_connect();
 
 	/**
 	* @brief 烧录 basic 程序到控制器
@@ -81,6 +89,10 @@ public:
 	*/
 	uint8_t load_basic_pragma(const char *basPath, uint32_t mode = 0);
 
+	uint8_t set_handle(ZMC_HANDLE handle);
+
+	uint8_t set_axis(const std::vector<int>& jointAxisIdx, const std::vector<int>& ikPosAxisIdx, const std::vector<int>& tcpAngleAxisIdx,
+		const std::vector<int>& tcpPosAxisIdx, const std::vector<int>& appAxisIdx, const std::vector<int>& camAxisIdx, const std::vector<int>& connpathAxisIdx);
 	/**
 	* @brief 直线摆动
 	*/
@@ -103,8 +115,13 @@ public:
 
 	uint8_t wait_idle(int axisIdx);
 
-	uint8_t swing_on(float vel);
-	uint8_t swing_off();
+	/**
+	* @brief 保存table数据到本地
+	*/
+	uint8_t save_table(size_t startIdx, size_t num = 1, const std::string& path = "./tableData.txt");
+
+	uint8_t swing_on(float vel, const Weave& waveCfg);
+	uint8_t swing_off(float displacement = 0.0);
 	uint8_t moveJ(const std::vector<float>& jntDPos);
 	uint8_t moveJ_single();
 	uint8_t moveL(const std::vector<float>& moveCmd);
@@ -120,9 +137,9 @@ public:
 	* @param moveCmd    位移指令，前三个元素为 TCP 点位移，后续元素为附加轴位移
 	* @param upper      运动平面的上方向
 	*/
-	uint8_t swingL(const std::vector<float>& moveCmd);
-	uint8_t swingL_(const std::vector<float>& moveCmd);
-	uint8_t swingLAbs(const std::vector<float>& moveCmd);
+	uint8_t swingL(const std::vector<float>& moveCmd, const Weave& waveCfg);
+	uint8_t swingL_(const std::vector<float>& moveCmd, const Weave& waveCfg);
+	uint8_t swingLAbs(const std::vector<float>& moveCmd, const Weave& waveCfg);
 
 	/**
 	* @brief 叠加摆动的圆弧运动
@@ -130,20 +147,25 @@ public:
 	* @param end     圆弧终点
 	* @param via     圆弧中间点
 	*/
-	uint8_t swingC(const std::vector<float>& endConfig, const std::vector<float>& midConfig);
-	uint8_t zswingC(const std::vector<float>& endConfig, const std::vector<float>& midConfig);
-	uint8_t swingC_(const std::vector<float>& endConfig, const std::vector<float>& midConfig);
+	uint8_t swingC(const std::vector<float>& endConfig, const std::vector<float>& midConfig, const Weave& waveCfg);
+	uint8_t zswingC(const std::vector<float>& endConfig, const std::vector<float>& midConfig, const Weave& waveCfg);
+	uint8_t swingC_(const std::vector<float>& endConfig, const std::vector<float>& midConfig, const Weave& waveCfg);
 
 	uint8_t test();
 
-	uint8_t execute_discrete_trajectory_abs();
+	uint8_t execute_discrete_trajectory_abs(DiscreteTrajectory<float>& discreteTrajectory);
 
-	uint8_t execute_discrete_trajectory();
+	uint8_t execute_discrete_trajectory(DiscreteTrajectory<float>& discreteTrajectory);
 
 	uint8_t swing_tri();
 
-	uint8_t swing_trajectory();
+	uint8_t swing_trajectory(DiscreteTrajectory<float>& discreteTrajectory, const Weave& waveCfg);
+
+	uint8_t arc_tracking_config(const Track& trackCfg);
+
+	uint8_t emergency_stop();
 
 };
+
 
 Eigen::Vector3f triangular_circumcenter(Eigen::Vector3f beg, Eigen::Vector3f mid, Eigen::Vector3f end);
