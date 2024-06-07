@@ -31,18 +31,16 @@ using namespace shawn_test;
 int main() {
 	//format_float("C:\\Users\\15874\\Desktop\\SD0.BIN", "C:\\Users\\15874\\Desktop\\SD0.txt");
 
-	if (robot.lazy_connect() > 0) {
-	//if (robot.connect_eth("127.0.0.1") > 0) {
-	//if (robot.connect_eth("192.168.1.14") > 0) {
-		std::cout << "\nConnect error, Press <Enter> exist!\n" << std::endl;
-		getchar();
-		return 1;
-	}
+	//if (robot.lazy_connect() > 0) {
+	//	std::cout << "\nConnect error, Press <Enter> exist!\n" << std::endl;
+	//	getchar();
+	//	return 1;
+	//}
 
 	//// 设置句柄
 	//robotB.set_handle(robot.handle_);
-	//// 设置轴号: 六个关节轴, 机械臂坐标系下TCP位置, TCP姿态, 世界坐标系下TCP位置, 附加轴, 凸轮轴, 插补矢量轴
-	//robotB.set_axis({ 0,1,2,3,4,5 }, { 9,10,11 }, { 12,13,14 }, { 15,16,17 }, { 18,19,20 }, { 36,37,38 }, { 39 });
+	//// 设置轴号: 六个关节轴, 机械臂坐标系下TCP位置, TCP姿态, 世界坐标系下TCP位置, 附加轴, 凸轮轴, 摆动轴, 插补矢量轴
+	//robotB.set_axis({ 0,1,2,3,4,5 }, { 7,8,9 }, { 10,11,12 }, { 7,8,9 }, {  }, { 36,37,38 }, { 40,41,42 }, { 39 });
 
 	//swing();
 	zswing();
@@ -59,51 +57,41 @@ void shawn_test::zswing() {
 	//robot.test();
 
 	// 摆焊参数
-	waveCfg.Freq = 2.3;
-	waveCfg.LeftWidth = 3.5;
-	waveCfg.RightWidth = 3.5;
-	waveCfg.Dwell_left = 500;
-	waveCfg.Dwell_right = 50;
-	waveCfg.Dwell_type = 0;
+	waveCfg.Freq = 1;
+	waveCfg.LeftWidth = 5;
+	waveCfg.RightWidth = 5;
+	waveCfg.Dwell_left = 100;
+	waveCfg.Dwell_right = 100;
+	waveCfg.Dwell_type = 1;
 
 	// 电弧跟踪参数
-	trackCfg.Lr_enable = 0;
-	trackCfg.Ud_enable = 0;
+	//trackCfg.Lr_enable = 0;
+	//trackCfg.Ud_enable = 0;
 
 	//robot.arc_tracking_config(trackCfg);
 
 	/* ****  **** */
 	// base(0,1,2,3,4,5) moveabs(-10.9961, -11.7299, 34.4224, 0, 67.3076, -55.9961)
-	//discreteTrajectory.set_starting_point({ 1000, -200, 200, 179.9990, -28.8890, -135, 0 });
-	//discreteTrajectory.add_line({ 1000, 200, 200, 179.9990, -28.8890, 135, 0.0 }, 20);
+	discreteTrajectory.set_starting_point({ 1000, -200, 200, 179.9990, -28.8890, -135, 0 });
+	discreteTrajectory.add_line({ 1000, 200, 200, 179.9990, -28.8890, 135, 0.0 }, 20);
 	//discreteTrajectory.add_line({ 1400, 200, 200, 179.9990, -28.8900, 45, 0.0 });
-	//discreteTrajectory.add_arc({ 1000, -200, 200, 179.9990, -28.8890, -135, 0 }, { 1000, 200, 200, 179.9990, -28.8890, 135, 0.0 });
+	//discreteTrajectory.add_arc({ 900, -200, 200, 179.9990, -28.8890, -135, 0 }, { 950, -150, 200, 179.9990, -28.8890, 135, 0.0 });
 
-	discreteTrajectory.set_starting_point({ 1310.7,-224.628,-69.899,-179.737,-48.0991,-8.9635, 0.0 });
-	discreteTrajectory.add_line({ 1308.7,-263.008,-69.99,-179.737,-48.0991,-8.9635, 0.0 }, 7);
+	//discreteTrajectory.set_starting_point({ 1310.7,-224.628,-69.899,-179.737,-48.0991,-8.9635, 0.0 });
+	//discreteTrajectory.add_line({ 1308.7,-263.008,-69.99,-179.737,-48.0991,-8.9635, 0.0 }, 7);
 	//discreteTrajectory.add_line({ 1400, 200, 200, 179.9990, -28.8900, 45, 0.0 });
+	//robot.swing_trajectory(discreteTrajectory, waveCfg);
 
-	robot.swing_trajectory(discreteTrajectory, waveCfg);
-	//for (size_t i = 0; i < 5; ++i) {
-	//	robot.swing_trajectory(discreteTrajectory, waveCfg);
-	//	ZAux_Direct_MoveDelay(robot.handle_, robot.tcpPosAxisIdx_[0], 2000);
-	//}
-
-	//robot.discreteTrajectory.set_starting_point({ 1015.1998, -100.0001, 139.4812, 177.8830, -31.1151, -139.9815, 0 });
-	//robot.discreteTrajectory.add_line({ 1013.0623, 99.9997, 139.5929, -177.4258, -30.7125, 128.5668, 0.0 });
-	////robot.discreteTrajectory.add_line({ 1200.0044, 102.7630, 139.2698, -177.3642, -27.1874, 53.1885, 0.0 });
-
-	//robot.discreteTrajectory.corner_transition(50, 50);
-
-	//robot.swing_on();
+	//discreteTrajectory.set_starting_point({ 1448.45081, -176.3273, 300.09, -164.6359, -33.1196, 163.8013 });
+	//discreteTrajectory.add_line({ 1448.44995, -176.34399, 79.5148, 172.42098, -35.4406, -170.82 }, 7);
 	//robot.execute_discrete_trajectory_abs(discreteTrajectory);
-	//robot.swing_off();
 
 	/* ****  **** */
 	//robot.swing_tri();
 
 	/* ****  **** */
-
+	discreteTrajectory.corner_transition();
+	discreteTrajectory.corner_slowdown(10);
 }
 
 void shawn_test::swing() {

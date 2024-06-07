@@ -15,8 +15,11 @@ public:
 	std::list<std::vector<T>> nodePoint;
 	//! 轨迹中间点 <位置, Rzyx(deg), 附加轴>
 	std::list<std::vector<T>> midPoint;
-	//! 轨迹信息
+	//! 轨迹信息    直线    方向(0:2),    -直线长度(3), null(4:6),     速度(7)
+	//              圆弧    圆心坐标(0:2),+圆弧长度(3), 旋转矢量(4:6), 速度(7)
 	std::list<std::vector<T>> trajInfo;
+	//! 最大角速度(deg/s)
+	//T angularVel = 10;
 
 public:
 	DiscreteTrajectory() {};
@@ -141,7 +144,7 @@ public:
 		auto infoIte = trajInfo.begin();
 
 		while (infoIte != trajInfo.end()) {
-			std::vector< Eigen::Matrix<T, N, 1>> transPnt = transition_interpolate(*begPntIte, *endPntIte, *infoIte, { inDist, inDist/2, std::fabs((*infoIte)(3))/2, -outDist/2, -outDist });
+			auto transPnt = transition_interpolate(*begPntIte, *endPntIte, *infoIte, { inDist, inDist/2, std::fabs((*infoIte)[3])/2, -outDist/2, -outDist });
 			// 插入路径点
 			nodePoint.insert(endPntIte, transPnt.front());
 			nodePoint.insert(endPntIte, transPnt.back());
@@ -151,43 +154,83 @@ public:
 			midPoint.insert(midPntIte, transPnt[3]);
 
 			// 起点过渡轨迹
-			Eigen::Matrix<T, 7, 1> begTraj = Eigen::Matrix<T, 7, 1>::Zero();
-			begTraj.head(3) = (*infoIte).head(3);
-			begTraj(3) = -inDist;
-			// 终点过渡轨迹
-			Eigen::Matrix<T, 7, 1> endTraj = Eigen::Matrix<T, 7, 1>::Zero();
-			endTraj.head(3) = (*infoIte).head(3);
-			endTraj(3) = -outDist;
+			std::vector<T> begTraj(8, 0);
+			for (size_t i = 0; i < 3; ++i) {
+				begTraj[i] = (*infoIte)[i];
+			}
+			begTraj[3] = -inDist;
+			begTraj[7] = (*infoIte)[7];
 
-			// 插入轨迹信息
+			// 终点过渡轨迹
+			std::vector<T> endTraj(8, 0);
+			for (size_t i = 0; i < 3; ++i) {
+				endTraj[i] = (*infoIte)[i];
+			}
+			endTraj[3] = -outDist;
+			endTraj[7] = (*infoIte)[7];
+
+			// 插入起点过渡轨迹信息
 			trajInfo.insert(infoIte, begTraj);
-			(*infoIte++)(3) -= begTraj(3) + endTraj(3);
+			// 原始轨迹信息修改
+			(*infoIte++)[3] -= begTraj[3] + endTraj[3];
+			// 插入终点过渡轨迹信息
 			trajInfo.insert(infoIte, endTraj);
+
 		}
 		
-		begPntIte = nodePoint.begin();
-		// 上一位姿
-		Eigen::Matrix<T, N, 1> prePnt = (*begPntIte++);
-		std::cout << "curPnt = " << prePnt.transpose() << std::endl;
+		//begPntIte = nodePoint.begin();
+		//// 上一位姿
+		//Eigen::Matrix<T, N, 1> prePnt = (*begPntIte++);
+		//std::cout << "curPnt = " << prePnt.transpose() << std::endl;
 
-		Eigen::Matrix<T, 3, 1> begEuler(prePnt[3], prePnt[4], prePnt[5]), endEuler = (*begPntIte).segment<3>(3);
+		//Eigen::Matrix<T, 3, 1> begEuler(prePnt[3], prePnt[4], prePnt[5]), endEuler = (*begPntIte).segment<3>(3);
 
-		while (begPntIte != nodePoint.end()) {
-			// 当前位姿
-			Eigen::Matrix<T, N, 1> curPnt = (*begPntIte++);
-			std::cout << "curPnt = " << curPnt.transpose() << std::endl;
-			std::cout << curPnt[0] - prePnt[0] << ", " << curPnt[1] - prePnt[1] << ", " << curPnt[2] - prePnt[2] << ", ";
-			endEuler = curPnt.segment<3>(3);
-			// 欧拉角相对值
-			Eigen::Matrix<T, 3, 1> relEuler = get_zyx_euler_distance(begEuler, endEuler);
-			for (size_t i = 0; i < 3; ++i) {
-				std::cout << relEuler[i] << ", ";
+		//while (begPntIte != nodePoint.end()) {
+		//	// 当前位姿
+		//	Eigen::Matrix<T, N, 1> curPnt = (*begPntIte++);
+		//	std::cout << "curPnt = " << curPnt.transpose() << std::endl;
+		//	std::cout << curPnt[0] - prePnt[0] << ", " << curPnt[1] - prePnt[1] << ", " << curPnt[2] - prePnt[2] << ", ";
+		//	endEuler = curPnt.segment<3>(3);
+		//	// 欧拉角相对值
+		//	Eigen::Matrix<T, 3, 1> relEuler = get_zyx_euler_distance(begEuler, endEuler);
+		//	for (size_t i = 0; i < 3; ++i) {
+		//		std::cout << relEuler[i] << ", ";
+		//	}
+		//	begEuler = endEuler;
+
+		//	prePnt = curPnt;
+		//	std::cout << "\n" << std::endl;
+		//}
+	}
+
+	/**
+	* @brief  拐角减速
+	* @param  angularVel    轨迹最大角速度，欧拉角矢量速度
+	*/
+	uint8_t corner_slowdown(T angularVel) {
+		// 遍历轨迹
+		auto nodePointIte = discreteTrajectory.nodePoint.begin();
+		//auto midPointIte = discreteTrajectory.midPoint.begin();
+		auto infoIte = discreteTrajectory.trajInfo.begin();
+
+		while (infoIte != discreteTrajectory.trajInfo.end()) {
+			std::vector<float> curBuffer = *(nodePointIte++);
+
+			Eigen::Matrix<T, 3, 1> begEuler, endEuler, relEuler;
+			// 起点过渡总旋转角度
+			begEuler = Eigen::Matrix<T, 3, 1>(curBuffer[3], curBuffer[4], curBuffer[5]);
+			endEuler = Eigen::Matrix<T, 3, 1>((*nodePointIte)[3], (*nodePointIte)[4], (*nodePointIte)[5]);
+			relEuler = get_zyx_euler_distance(begEuler, endEuler);
+			T sumAngle = std::sqrt(relEuler[0]* relEuler[0] + relEuler[1]* relEuler[1] + relEuler[2]* relEuler[2]);
+			// 速度修正
+			if (sumAngle / angularVel > std::fabs((*infoIte)[3]) / (*infoIte)[7]) {
+				(*infoIte)[7] = angularVel * std::fabs((*infoIte)[3]) / sumAngle;
 			}
-			begEuler = endEuler;
 
-			prePnt = curPnt;
-			std::cout << "\n" << std::endl;
+			infoIte++;
 		}
+
+		return 0;
 	}
 
 	/**
@@ -227,8 +270,8 @@ public:
 		T pitchAngle = std::acos(dotProd);
 		pitchAngle *= (begUprightDir_end.cross(endUprightDir).dot(endTan) < 0) ? -1 : 1;
 
-		std::cout << "\n===========\nbegMat = \n" << begMat << std::endl;
-		std::cout << "endMat = \n" << endMat << "\n===========\n" << std::endl;
+		//std::cout << "\n===========\nbegMat = \n" << begMat << std::endl;
+		//std::cout << "endMat = \n" << endMat << "\n===========\n" << std::endl;
 		for (size_t i = 0; i < distList.size(); ++i) {
 			
 			// 过渡点
@@ -250,7 +293,7 @@ public:
 				transMat.col(1) = begMat.col(1).dot(begTan) >= 0 ? begTan : -begTan;
 				transMat.col(0) = (transMat.col(1).cross(transMat.col(2))).normalized();
 				// 俯仰角修正
-				transMat = (Eigen::AngleAxis<T>(pitchAngle * inDist / std::fabs(info(3)), begTan) * transMat).eval();
+				transMat = (Eigen::AngleAxis<T>(pitchAngle * inDist / std::fabs(info[3]), begTan) * transMat).eval();
 
 				// 直线
 				if (info[3] < 0) {
@@ -261,9 +304,9 @@ public:
 				}
 				// 圆弧
 				else if (info[3] > 0) {
-					Eigen::Matrix<T, 3, 1> center = infoHead3 + Eigen::AngleAxis<T>(inDist / std::fabs(info[3]), infoTail3) * (begHad3 - infoHead3);
+					Eigen::Matrix<T, 3, 1> center = infoHead3 + Eigen::AngleAxis<T>(inDist / std::fabs(info[3]), infoTail3) * (begHead3 - infoHead3);
 					for (size_t i = 0; i < 3; ++i) {
-						transPnt[i] = dir[i];
+						transPnt[i] = center[i];
 					}
 					transMat = (Eigen::AngleAxis<T>(inDist / std::fabs(info[3]), infoTail3) * transMat).eval();
 				}
@@ -292,7 +335,7 @@ public:
 				else if (info[3] > 0) {
 					Eigen::Matrix<T, 3, 1> center = infoHead3 + Eigen::AngleAxis<T>(outDist / std::fabs(info[3]), -infoTail3) * (endHead3 - infoHead3);
 					for (size_t i = 0; i < 3; ++i) {
-						transPnt[i] = dir[i];
+						transPnt[i] = center[i];
 					}
 					transMat = (Eigen::AngleAxis<T>(outDist / std::fabs(info[3]), -infoTail3) * transMat).eval();
 				}
@@ -300,9 +343,6 @@ public:
 				lambda = 1.0 - outDist / std::fabs(info[3]);
 			}
 
-			if (i == 0 || i == 4) {
-				std::cout << "TransMat = \n" << transMat << std::endl;
-			}
 			// 过渡点欧拉角
 			Eigen::Matrix<T, 3, 1> transEuler = transMat.eulerAngles(2, 1, 0).reverse() * 180 / DT_PI;
 			for (size_t j = 0; j < 3; ++j) {
@@ -313,9 +353,6 @@ public:
 				transPnt[j] = begPnt[j] + (endPnt[j] - begPnt[j]) * lambda;
 			}
 			ans[i] = transPnt;
-			if (i == 0 || i == 4) {
-				std::cout << "transPnt = \n" << transPnt.transpose() << "\n" << std::endl;
-			}
 		}
 
 		return ans;
@@ -435,7 +472,7 @@ Eigen::Matrix<T, 3, 1> get_zyx_euler_distance(Eigen::Matrix<T, 3, 1>& begEuler, 
 	// equivalent of endEuler
 	Eigen::Matrix<T, 3, 1> equivEuler = get_equivalent_zyx_euler(endEuler);
 	if (endEuler[1] == 90) {
-		equivEuler[0] = (equivEuler[2] > 0) ? std::min(begEuler[0], begEuler[2]) : (std::max)(begEuler[0], begEuler[2]);
+		equivEuler[0] = (equivEuler[2] > 0) ? (std::min)(begEuler[0], begEuler[2]) : (std::max)(begEuler[0], begEuler[2]);
 		equivEuler[2] += equivEuler[0];
 	}
 	else if (endEuler[1] == -90) {

@@ -23,6 +23,8 @@ class ZauxAxis {
 	//uint8_t load_uploaded_config();
 	// 加载轴参数
 	//uint8_t download_config();
+	// 获取缓冲位置
+	//std::vector<float> get_axis_param(const std::vector<int>& axisList);
 
 private:
 	// 轴类型
@@ -54,6 +56,8 @@ public:
 	std::vector<int> appAxisIdx_ = { 6,30,31 };
 	// 凸轮轴
 	std::vector<int> camAxisIdx_ = { 23, 24, 25 };
+	// 摆动轴
+	std::vector<int> swingAxisIdx_ = { 26,27,28 };
 	// 插补矢量轴
 	std::vector<int> connpathAxisIdx_ = { 15 };
 
@@ -61,7 +65,7 @@ public:
 	size_t swingFlagIdx = 1000;
 
 	// 脉冲当量
-	float axisUnits = 1;
+	float axisUnits = 1000;
 
 	// 摆焊参数
 	//Weave waveCfg;
@@ -71,7 +75,8 @@ public:
 public:
 	ZauxRobot();
 	ZauxRobot(const std::vector<int>& jointAxisIdx, const std::vector<int>& ikPosAxisIdx, const std::vector<int>& tcpAngleAxisIdx,
-		const std::vector<int>& tcpPosAxisIdx, const std::vector<int>& appAxisIdx, const std::vector<int>& camAxisIdx, const std::vector<int>& connpathAxisIdx
+		const std::vector<int>& tcpPosAxisIdx, const std::vector<int>& appAxisIdx, const std::vector<int>& camAxisIdx, const std::vector<int>& swingAxisIdx,
+		const std::vector<int>& connpathAxisIdx
 	);
 	/**
 	* @brief 通过网口连接控制器
@@ -92,7 +97,8 @@ public:
 	uint8_t set_handle(ZMC_HANDLE handle);
 
 	uint8_t set_axis(const std::vector<int>& jointAxisIdx, const std::vector<int>& ikPosAxisIdx, const std::vector<int>& tcpAngleAxisIdx,
-		const std::vector<int>& tcpPosAxisIdx, const std::vector<int>& appAxisIdx, const std::vector<int>& camAxisIdx, const std::vector<int>& connpathAxisIdx);
+		const std::vector<int>& tcpPosAxisIdx, const std::vector<int>& appAxisIdx, const std::vector<int>& camAxisIdx, const std::vector<int>& swingAxisIdx,
+		const std::vector<int>& connpathAxisIdx);
 	/**
 	* @brief 直线摆动
 	*/
@@ -116,6 +122,22 @@ public:
 	uint8_t wait_idle(int axisIdx);
 
 	/**
+	* @brief  读取多轴的当前和缓冲中运动的最终位置
+	* @param       axisList     需要获取参数的轴号列表
+	* @param       paramName    参数名称
+	* @param[out]  paramList    返回的参数列表
+	*/
+	uint8_t get_axis_param(const std::vector<int>& axisList, char* paramName, std::vector<float>& paramList);
+
+	/**
+	* @brief 设置多轴参数
+	* @param       axisList     需要获取参数的轴号列表
+	* @param       paramName    参数名称
+	* @param       principal    主轴索引: -1 立即设置; >0 缓冲中设置
+	*/
+	uint8_t set_axis_param(const std::vector<int>& axisList, char* paramName, const std::vector<float>& paramList, int principal = -1);
+
+	/**
 	* @brief 保存table数据到本地
 	*/
 	uint8_t save_table(size_t startIdx, size_t num = 1, const std::string& path = "./tableData.txt");
@@ -126,7 +148,8 @@ public:
 	uint8_t moveJ_single();
 	uint8_t moveL(const std::vector<float>& moveCmd);
 	uint8_t moveL_single();
-	uint8_t moveC(const std::vector<float>& endConfig, const std::vector<float>& midConfig);
+	uint8_t moveC(const std::vector<int>& axis, const std::vector<float>& begPoint, const std::vector<float>& midPoint, const std::vector<float>& endPoint,
+				  int imode = 0);
 
 	// 焊机控制
 	uint8_t wlder_on(float current, float voltage);
@@ -148,17 +171,12 @@ public:
 	* @param via     圆弧中间点
 	*/
 	uint8_t swingC(const std::vector<float>& endConfig, const std::vector<float>& midConfig, const Weave& waveCfg);
-	uint8_t zswingC(const std::vector<float>& endConfig, const std::vector<float>& midConfig, const Weave& waveCfg);
 	uint8_t swingC_(const std::vector<float>& endConfig, const std::vector<float>& midConfig, const Weave& waveCfg);
 
-	uint8_t test();
-
 	uint8_t execute_discrete_trajectory_abs(DiscreteTrajectory<float>& discreteTrajectory);
-
 	uint8_t execute_discrete_trajectory(DiscreteTrajectory<float>& discreteTrajectory);
 
 	uint8_t swing_tri();
-
 	uint8_t swing_trajectory(DiscreteTrajectory<float>& discreteTrajectory, const Weave& waveCfg);
 
 	uint8_t arc_tracking_config(const Track& trackCfg);
