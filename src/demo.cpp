@@ -31,11 +31,11 @@ using namespace shawn_test;
 int main() {
 	//format_float("C:\\Users\\15874\\Desktop\\SD0.BIN", "C:\\Users\\15874\\Desktop\\SD0.txt");
 
-	//if (robot.lazy_connect() > 0) {
-	//	std::cout << "\nConnect error, Press <Enter> exist!\n" << std::endl;
-	//	getchar();
-	//	return 1;
-	//}
+	if (robot.lazy_connect() > 0) {
+		std::cout << "\nConnect error, Press <Enter> exist!\n" << std::endl;
+		getchar();
+		return 1;
+	}
 
 	//// 设置句柄
 	//robotB.set_handle(robot.handle_);
@@ -57,30 +57,30 @@ void shawn_test::zswing() {
 	//robot.test();
 
 	// 摆焊参数
-	waveCfg.Freq = 1;
-	waveCfg.LeftWidth = 5;
-	waveCfg.RightWidth = 5;
-	waveCfg.Dwell_left = 100;
-	waveCfg.Dwell_right = 100;
+	waveCfg.Freq = 2.4;
+	waveCfg.LeftWidth = 1.5;
+	waveCfg.RightWidth = 1.5;
+	waveCfg.Dwell_left = 0;
+	waveCfg.Dwell_right = 0;
 	waveCfg.Dwell_type = 1;
 
 	// 电弧跟踪参数
-	//trackCfg.Lr_enable = 0;
-	//trackCfg.Ud_enable = 0;
-
-	//robot.arc_tracking_config(trackCfg);
+	trackCfg.Lr_enable = 0;
+	trackCfg.Ud_enable = 0;
+	robot.arc_tracking_config(trackCfg);
 
 	/* ****  **** */
 	// base(0,1,2,3,4,5) moveabs(-10.9961, -11.7299, 34.4224, 0, 67.3076, -55.9961)
-	discreteTrajectory.set_starting_point({ 1000, -200, 200, 179.9990, -28.8890, -135, 0 });
-	discreteTrajectory.add_line({ 1000, 200, 200, 179.9990, -28.8890, 135, 0.0 }, 20);
+	//discreteTrajectory.set_starting_point({ 1000, -200, 200, 179.9990, -28.8890, -135, 0 });
+	//discreteTrajectory.add_line({ 1000, 200, 200, 179.9990, -28.8890, 135, 0.0 }, 20);
 	//discreteTrajectory.add_line({ 1400, 200, 200, 179.9990, -28.8900, 45, 0.0 });
 	//discreteTrajectory.add_arc({ 900, -200, 200, 179.9990, -28.8890, -135, 0 }, { 950, -150, 200, 179.9990, -28.8890, 135, 0.0 });
+	//discreteTrajectory.equally_divide({ 200, 100 });
 
-	//discreteTrajectory.set_starting_point({ 1310.7,-224.628,-69.899,-179.737,-48.0991,-8.9635, 0.0 });
-	//discreteTrajectory.add_line({ 1308.7,-263.008,-69.99,-179.737,-48.0991,-8.9635, 0.0 }, 7);
-	//discreteTrajectory.add_line({ 1400, 200, 200, 179.9990, -28.8900, 45, 0.0 });
-	//robot.swing_trajectory(discreteTrajectory, waveCfg);
+	discreteTrajectory.set_starting_point({ 1537.45,-88.0971,140.622,-183.63,-42.4007,-176.326, 0.0 });
+	discreteTrajectory.add_arc({ 1379.79,-88.5931,127.114,-183.63,-46.7397,-363.264, 0.0 }, { 1457.33,-171.59,132.004,-183.63,-42.5047,-275.824, 0.0 });
+	//discreteTrajectory.add_arc({ 1530.31,-98.6249,220.496,177.605,-45.8086,529.062, 0.0 }, { 1455.21,-162.225,214.756,177.605,-45.8086,442.74, 0.0 });
+	robot.swing_trajectory(discreteTrajectory, waveCfg);
 
 	//discreteTrajectory.set_starting_point({ 1448.45081, -176.3273, 300.09, -164.6359, -33.1196, 163.8013 });
 	//discreteTrajectory.add_line({ 1448.44995, -176.34399, 79.5148, 172.42098, -35.4406, -170.82 }, 7);
@@ -90,8 +90,8 @@ void shawn_test::zswing() {
 	//robot.swing_tri();
 
 	/* ****  **** */
-	discreteTrajectory.corner_transition();
-	discreteTrajectory.corner_slowdown(10);
+	//discreteTrajectory.corner_transition();
+	//discreteTrajectory.corner_slowdown(10);
 }
 
 void shawn_test::swing() {

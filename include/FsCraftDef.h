@@ -98,7 +98,7 @@ public:
 class Track {
 public:
 	int Id = 0;
-	int Lr_enable = 1;						//上下跟踪使能	
+	int Lr_enable = 1;						//上下跟踪使能
 	int Ud_enable = 1;						//左右跟踪使能
 	int Signal_Type = 0;					//信号源 0焊机
 	int TrackerPar_Id = 0;					//跟踪器ID
@@ -107,8 +107,13 @@ public:
 	double AdjustDelayTime = 0.5;			//采样延迟时间
 	double SegCorrectMaxProportion = 0.0;   //分段纠偏最大比例
 	double SegCorrectCycles = 0.0;          //分段纠偏周期数
+	// double filterCoeff = 20;               //滤波系数
 
 	double Lr_gain = 0.28;					//左右跟踪增益
+	//double Lr_inteCoeff = 1000;             //左右积分时间
+	//double Lr_inteActive = 10;              //左右积分分离区间
+	//double Lr_inteSupremum = 100;           //左右积分上限
+	//double Lr_diffCoeff = 0;                //左右微分时间
 	double Lr_offset = 0;					//左右基准偏差
 	double Lr_maxSingleCompensation = 3;	//左右单次最大补偿量
 	double Lr_minCompensation = 0;			//左右最小补偿量

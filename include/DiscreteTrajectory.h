@@ -232,6 +232,122 @@ public:
 
 		return 0;
 	}
+	
+	/**
+	* @brief  均匀分隔
+	* @param  separation    间隔宽度
+	*/
+	uint8_t equally_divide(const std::vector<T>& separation) {
+		// 分段总距离
+		T phaseDist = 0.0;
+		for (size_t i = 0; i < separation.size(); ++i) {
+			phaseDist += separation[i];
+		}
+
+		// 遍历轨迹
+		auto nodePointIte = nodePoint.begin();
+		auto midPointIte = midPoint.begin();
+		auto infoIte = trajInfo.begin();
+
+		Eigen::Vector3f begEuler((*nodePointIte)[3], (*nodePointIte)[4], (*nodePointIte)[5]), endEuler = begEuler;
+		while (infoIte != trajInfo.end()) {
+			std::vector<T> begBuffer = *(nodePointIte++);
+			// 当前点距离
+			T curDist = 0.0, midDist = 0.0, trajDist = std::fabs((*infoIte)[3]);
+
+			std::vector<T> relEndMove(begBuffer.size(), 0);
+			// 终点到起点的相对运动
+			for (size_t i = 0; i < begBuffer.size(); ++i) {
+				relEndMove[i] = (*nodePointIte)[i] - begBuffer[i];
+			}
+
+			// 欧拉角相对距离
+			begEuler = Eigen::Vector3f(begBuffer[3], begBuffer[4], begBuffer[5]);
+			endEuler = Eigen::Vector3f((*nodePointIte)[3], (*nodePointIte)[4], (*nodePointIte)[5]);
+			Eigen::Vector3f relEuler = get_zyx_euler_distance(begEuler, endEuler);
+			begEuler = endEuler;
+
+			// 完整周期个数
+			int numPeriod = std::floor(std::fabs((*infoIte)[3]) / phaseDist);
+			bool isRedundant = true;
+			for (size_t i = 0; i < numPeriod + 1; ++i) {
+				if (!isRedundant)
+					break;
+				for (size_t j = 0; j < separation.size(); ++j) {
+					// 不够添加新的轨迹
+					if (std::fabs((*infoIte)[3]) < separation[j]) {
+						isRedundant = false;
+						break;
+					}
+
+					curDist += separation[j];
+					midDist = curDist - separation[j] / 2;
+					
+					std::vector<T> sepaPoint(begBuffer.size(), 0), curMidPoint(begBuffer.size(), 0), sepaTraj = *infoIte;
+					// 间隔点位置
+					Eigen::Matrix<T, 3, 1> curPos(0,0,0), midPos(0,0,0), endMidPos(0,0,0);
+
+					if ((*infoIte)[3] < 0) {
+						Eigen::Matrix<T, 3, 1> begPos(begBuffer[0], begBuffer[1], begBuffer[2]);
+						Eigen::Matrix<T, 3, 1> dir((*infoIte)[0], (*infoIte)[1], (*infoIte)[2]);
+						curPos = begPos + dir * curDist;
+						midPos = begPos + dir * midDist;
+						endMidPos = begPos + dir * (trajDist + curDist) / 2;
+						// 新增轨迹信息
+						sepaTraj[3] = -separation[j];
+						// 原始轨迹修改
+						(*infoIte)[3] += separation[j];
+					}
+					else if ((*infoIte)[3] > 0) {
+						Eigen::Matrix<T, 3, 1> radius(begBuffer[0] - (*infoIte)[0], begBuffer[1] - (*infoIte)[1], begBuffer[2] - (*infoIte)[2]);
+						Eigen::Matrix<T, 3, 1> center((*infoIte)[0], (*infoIte)[1], (*infoIte)[2]);
+						Eigen::Matrix<T, 3, 1> norm((*infoIte)[4], (*infoIte)[5], (*infoIte)[6]);
+						T theta = trajDist / radius.norm();
+						norm.normalize();
+						curPos = Eigen::AngleAxis<T>(theta * curDist / trajDist, norm) * radius + center;
+						midPos = Eigen::AngleAxis<T>(theta * midDist / trajDist, norm) * radius + center;
+						endMidPos = Eigen::AngleAxis<T>(theta * (trajDist + curDist) / 2 / trajDist, norm) * radius + center;
+						// 新增轨迹信息
+						sepaTraj[3] = separation[j];
+						sepaTraj[4] = norm[0] * separation[j] / trajDist * theta;
+						sepaTraj[5] = norm[1] * separation[j] / trajDist * theta;
+						sepaTraj[6] = norm[2] * separation[j] / trajDist * theta;
+						// 原始轨迹修改
+						(*infoIte)[3] -= separation[j];
+						(*infoIte)[4] = norm[0] * (trajDist - curDist) / trajDist * theta;
+						(*infoIte)[5] = norm[1] * (trajDist - curDist) / trajDist * theta;
+						(*infoIte)[6] = norm[2] * (trajDist - curDist) / trajDist * theta;
+					}
+					for (size_t k = 0; k < 3; ++k) {
+						sepaPoint[k] = curPos[k];
+						curMidPoint[k] = midPos[k];
+						// 原始轨迹中间点修改
+						(*midPointIte)[k] = endMidPos[k];
+					}
+					// 间隔点欧拉角
+					for (size_t k = 3; k < 6; ++k) {
+						sepaPoint[k] = begBuffer[k] + curDist / std::fabs((*infoIte)[3]) * relEuler[k - 3];
+						curMidPoint[k] = begBuffer[k] + midDist / std::fabs((*infoIte)[3]) * relEuler[k - 3];
+						(*midPointIte)[k] = begBuffer[k] + (trajDist + curDist) / 2 / std::fabs((*infoIte)[3]) * relEuler[k - 3];
+					}
+					for (size_t k = 6; k < begBuffer.size(); ++k) {
+						sepaPoint[k] = begBuffer[k] + curDist / trajDist * relEndMove[k];
+						curMidPoint[k] = begBuffer[k] + midDist / trajDist * relEndMove[k];
+						(*midPointIte)[k] = begBuffer[k] + (trajDist + curDist) / 2 / trajDist * relEndMove[k];
+					}
+
+					nodePoint.insert(nodePointIte, sepaPoint);
+					midPoint.insert(midPointIte, curMidPoint);
+					trajInfo.insert(infoIte, sepaTraj);
+				}
+			}
+
+			midPointIte++;
+			infoIte++;
+		}
+
+		return 0;
+	}
 
 	/**
 	* @brief  拐角过渡点插值
@@ -534,10 +650,6 @@ Eigen::Matrix<T, 3, 1> get_zyx_euler_distance(Eigen::Matrix<T, 3, 1>& begEuler, 
 		}
 	}
 
-	//std::cout << "begEuler = " << begEuler.transpose() << std::endl;
-	//std::cout << "endEuler = " << endEuler.transpose() << "  -> " << endRel.transpose() << " | sum = " << endSum << std::endl;
-	//std::cout << "equEuler = " << equivEuler.transpose() << "  -> " << equivRel.transpose() << " | sum = " << equivSum << std::endl;
-	//std::cout << "return: " << ans.transpose() << std::endl;
 	return ans;
 }
 

@@ -329,6 +329,10 @@ uint8_t ZauxRobot::moveC(const std::vector<int>& axis, const std::vector<float>&
 }
 
 uint8_t ZauxRobot::save_table(size_t startIdx, size_t num, const std::string& path) {
+	if (num == 0) {
+		return 0;
+	}
+
 	// 单次最大读取数量
 	size_t maxNum = 1000;
 	// 读取缓冲
@@ -1655,8 +1659,11 @@ uint8_t ZauxRobot::swing_trajectory(DiscreteTrajectory<float>& discreteTrajector
 	auto midPointIte = discreteTrajectory.midPoint.begin();
 	auto infoIte = discreteTrajectory.trajInfo.begin();
 
+	float trajIdx = 0;
 	Eigen::Vector3f begEuler((*nodePointIte)[3], (*nodePointIte)[4], (*nodePointIte)[5]), endEuler = begEuler;
 	while (infoIte != discreteTrajectory.trajInfo.end()) {
+		// 轨迹数+1
+		ZAux_Direct_MoveTable(handle_, axis[0], 1001, trajIdx++);
 		std::vector<float> endBuffer = *(nodePointIte++);
 
 		std::vector<float> relEndMove(axis.size(), 0);
@@ -1767,8 +1774,6 @@ uint8_t ZauxRobot::swing_trajectory(DiscreteTrajectory<float>& discreteTrajector
 				}
 				this->moveC(axis, tempBegPoint, tempCenPoint, tempEndPoint, 1);
 				tempBegPoint = tempEndPoint;
-				if (waveCfg.Dwell_right > 0)
-					ZAux_Direct_MoveDelay(handle_, axis[0], waveCfg.Dwell_right);
 			}
 			// 摆动停止
 			else {
@@ -1830,30 +1835,34 @@ uint8_t ZauxRobot::swing_trajectory(DiscreteTrajectory<float>& discreteTrajector
 }
 
 uint8_t ZauxRobot::arc_tracking_config(const Track& trackCfg) {
-	// 跟踪使能
-	//float enableFlag[2] = { trackCfg.Lr_enable, trackCfg.Ud_enable };
-	//ZAux_Direct_SetTable(handle_, 1004, 2, enableFlag);
+	std::vector<float> config(20, 0);
+	size_t configTableStart = 1010;
 
-	std::vector<float> config(14, 0);
+	// 读取现有参数
+	ZAux_Direct_GetTable(handle_, configTableStart, config.size(), config.data());
+
 	// 左右跟踪参数
 	config[0] = trackCfg.Lr_enable;
-	config[1] = trackCfg.Lr_gain;
-	config[2] = trackCfg.Lr_minCompensation;
-	config[3] = trackCfg.Lr_maxCompensation;
-	config[4] = trackCfg.Lr_offset;
-	config[5] = trackCfg.Lr_MaxCorrectAngle;
+	config[1] = trackCfg.Lr_offset;
+	config[2] = trackCfg.Lr_gain;
+	// 积分常数
+	config[3] = trackCfg.Lr_maxSingleCompensation;
+	//config[4] = trackCfg.Lr_diffCoeff;
+	config[5] = trackCfg.Lr_minCompensation;
+	config[6] = trackCfg.Lr_maxCompensation;
+	config[7] = trackCfg.Lr_MaxCorrectAngle;
 	// 上下跟踪参数
-	config[6] = trackCfg.Ud_enable;
-	config[7] = trackCfg.Ud_gain;
-	config[8] = trackCfg.Ud_minCompensation;
-	config[9] = trackCfg.Ud_maxCompensation;
-	config[10] = trackCfg.Ud_offset;
-	config[11] = trackCfg.Ud_MaxCorrectAngle;
+	config[10] = trackCfg.Ud_enable;
+	config[11] = trackCfg.Ud_offset;
+	config[12] = trackCfg.Ud_gain;
+	config[15] = trackCfg.Ud_minCompensation;
+	config[16] = trackCfg.Ud_maxCompensation;
+	config[17] = trackCfg.Ud_MaxCorrectAngle;
 	// 其他参数
-	config[12] = trackCfg.SegCorrectCycles;
-	config[13] = trackCfg.Ud_refSampleCount;
+	config[18] = trackCfg.SegCorrectCycles;
+	config[19] = trackCfg.Ud_refSampleCount;
 
-	ZAux_Direct_SetTable(handle_, 1010, config.size(), config.data());
+	ZAux_Direct_SetTable(handle_, configTableStart, config.size(), config.data());
 	return 0;
 }
 
