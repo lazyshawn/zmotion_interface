@@ -297,9 +297,13 @@ uint8_t ZauxRobot::moveC(const std::vector<int>& axis, const std::vector<float>&
 	for (size_t i = 0; i < num; ++i) {
 		relMidMove[i] = midPoint[i] - begPoint[i];
 	}
+	// 相对角度: beg -> mid -> end
 	Eigen::Vector3f begEuler = Eigen::Vector3f(begPoint[3], begPoint[4], begPoint[5]);
 	Eigen::Vector3f endEuler = Eigen::Vector3f(midPoint[3], midPoint[4], midPoint[5]);
 	Eigen::Vector3f relEuler = get_zyx_euler_distance(begEuler, endEuler);
+	begEuler = endEuler;
+	endEuler = Eigen::Vector3f(endPoint[3], endPoint[4], endPoint[5]);
+	relEuler += get_zyx_euler_distance(begEuler, endEuler);
 	for (size_t i = 0; i < 3; ++i) {
 		relMidMove[3 + i] = relEuler[i];
 	}
@@ -1672,10 +1676,13 @@ uint8_t ZauxRobot::swing_trajectory(DiscreteTrajectory<float>& discreteTrajector
 			relEndMove[i] = (*nodePointIte)[i] - endBuffer[i];
 		}
 
-		// 欧拉角转换到相对运动
-		begEuler = Eigen::Vector3f(endBuffer[3], endBuffer[4], endBuffer[5]);
-		endEuler = Eigen::Vector3f((*nodePointIte)[3], (*nodePointIte)[4], (*nodePointIte)[5]);
+		// 欧拉角转换到相对运动: beg -> mid -> end
+		Eigen::Vector3f begEuler = Eigen::Vector3f(endBuffer[3], endBuffer[4], endBuffer[5]);
+		Eigen::Vector3f endEuler = Eigen::Vector3f((*midPointIte)[3], (*midPointIte)[4], (*midPointIte)[5]);
 		Eigen::Vector3f relEuler = get_zyx_euler_distance(begEuler, endEuler);
+		begEuler = endEuler;
+		endEuler = Eigen::Vector3f((*nodePointIte)[3], (*nodePointIte)[4], (*nodePointIte)[5]);
+		relEuler += get_zyx_euler_distance(begEuler, endEuler);
 		for (size_t i = 0; i < 3; ++i) {
 			relEndMove[3 + i] = relEuler[i];
 		}
@@ -1692,17 +1699,6 @@ uint8_t ZauxRobot::swing_trajectory(DiscreteTrajectory<float>& discreteTrajector
 		// 计算轴运动距离
 		int numPeriod = std::round(std::fabs((*infoIte)[3]) / (vel / waveCfg.Freq));
 		swing_off(std::fabs((*infoIte)[3]));
-		//if (waveCfg.Dwell_type > 0 && (waveCfg.Dwell_left + waveCfg.Dwell_right) > 0) {
-		//	float totalDist = std::sqrt(relEndMove[0] * relEndMove[0] + relEndMove[1] * relEndMove[1] + relEndMove[2] * relEndMove[2]);
-		//	float halfDist = std::floor(totalDist / numPeriod / 2 * axisUnits) / axisUnits;
-		//	float quartDist = std::floor(totalDist / numPeriod / 4 * axisUnits) / axisUnits;
-		//	float zmotionDist = halfDist * ((numPeriod - 1) * 2 + 1) + quartDist * 2;
-		//	// 摆动结束
-		//	swing_off(zmotionDist);
-		//}
-		//else {
-		//	swing_off(std::fabs((*infoIte)[3]));
-		//}
 		
 		// 圆弧运动
 		if ((*infoIte)[3] > 0) {
