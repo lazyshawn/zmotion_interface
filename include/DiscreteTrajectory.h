@@ -48,7 +48,7 @@ public:
 	* @brief  记录直线轨迹
 	* @param  pnt    直线终点数据
 	*/
-	uint8_t add_line(const std::vector<T>& pnt, T vel = 10) {
+	uint8_t add_line(const std::vector<T>& pnt, T vel = 10, T smooth = -1) {
 		if (nodePoint.size() < 1) return 1;
 
 		size_t N = nodePoint.front().size(), num = (std::min)(N, pnt.size());
@@ -64,10 +64,13 @@ public:
 		for (size_t i = 0; i < N; ++i) {
 			tmp[i] = (cur[i] + tmp[i]) / 2;
 		}
+		for (size_t i = 3; i < 6; ++i) {
+			tmp[i] = cur[i];
+		}
 		midPoint.push_back(tmp);
 
 		// 计算轨迹信息
-		std::vector<T> info(8, 0);
+		std::vector<T> info(9, 0);
 		Eigen::Matrix<T, 3, 1> curPos(cur[0], cur[1], cur[2]), endPos(pnt[0], pnt[1], pnt[2]);
 
 		// 直线方向
@@ -79,6 +82,8 @@ public:
 		info[3] = -1 * (endPos - curPos).norm();
 		// 轨迹速度
 		info[7] = vel;
+		// 平滑度
+		info[8] = smooth;
 		trajInfo.push_back(info);
 		
 		return 0;
@@ -89,7 +94,7 @@ public:
 	* @param  end    圆弧终点
 	* @param  mid    圆弧中间点
 	*/
-	uint8_t add_arc(const std::vector<T>& end, const std::vector<T>& mid, T vel = 10) {
+	uint8_t add_arc(const std::vector<T>& end, const std::vector<T>& mid, T vel = 10, T smooth = -1) {
 		if (nodePoint.size() < 1) return 1;
 		
 		size_t N = nodePoint.front().size(), num = (std::min)(N, end.size());
@@ -111,13 +116,15 @@ public:
 		// 计算轨迹信息
 		Eigen::Matrix<T, 3, 1> begPnt(cur[0], cur[1], cur[2]), midPnt(mid[0], mid[1], mid[2]), endPnt(end[0], end[1], end[2]);
 		Eigen::Matrix<T, 7, 1> arcInfo = construct_arc_trajectory(begPnt, midPnt, endPnt);
-		std::vector<T> info(8);
+		std::vector<T> info(9);
 		// 轨迹形状
 		for (size_t i = 0; i < 7; ++i) {
 			info[i] = arcInfo[i];
 		}
 		// 轨迹速度
 		info[7] = vel;
+		// 平滑度
+		info[8] = smooth;
 
 		trajInfo.push_back(info);
 
@@ -154,7 +161,7 @@ public:
 			midPoint.insert(midPntIte, transPnt[3]);
 
 			// 起点过渡轨迹
-			std::vector<T> begTraj(8, 0);
+			std::vector<T> begTraj(9, 0);
 			for (size_t i = 0; i < 3; ++i) {
 				begTraj[i] = (*infoIte)[i];
 			}
@@ -162,7 +169,7 @@ public:
 			begTraj[7] = (*infoIte)[7];
 
 			// 终点过渡轨迹
-			std::vector<T> endTraj(8, 0);
+			std::vector<T> endTraj(9, 0);
 			for (size_t i = 0; i < 3; ++i) {
 				endTraj[i] = (*infoIte)[i];
 			}
@@ -209,11 +216,11 @@ public:
 	*/
 	uint8_t corner_slowdown(T angularVel) {
 		// 遍历轨迹
-		auto nodePointIte = discreteTrajectory.nodePoint.begin();
-		//auto midPointIte = discreteTrajectory.midPoint.begin();
-		auto infoIte = discreteTrajectory.trajInfo.begin();
+		auto nodePointIte = nodePoint.begin();
+		//auto midPointIte = midPoint.begin();
+		auto infoIte = trajInfo.begin();
 
-		while (infoIte != discreteTrajectory.trajInfo.end()) {
+		while (infoIte != trajInfo.end()) {
 			std::vector<float> curBuffer = *(nodePointIte++);
 
 			Eigen::Matrix<T, 3, 1> begEuler, endEuler, relEuler;

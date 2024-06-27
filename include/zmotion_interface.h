@@ -1,3 +1,4 @@
+#pragma warning(disable : 4996)
 #pragma once
 
 #include<vector>
@@ -67,10 +68,6 @@ public:
 	// 脉冲当量
 	float axisUnits = 1000;
 
-	// 摆焊参数
-	//Weave waveCfg;
-	// 连续轨迹处理
-	//DiscreteTrajectory<float> discreteTrajectory;
 
 public:
 	ZauxRobot();
@@ -93,21 +90,34 @@ public:
 			 1          烧录到 ROM
 	*/
 	uint8_t load_basic_pragma(const char *basPath, uint32_t mode = 0);
+	//uint8_t load_basic_project(const char *basPath, uint32_t mode = 0);
 
+	//uint8_t enable_zaux_log(int logMode);
+
+	/**
+	* @brief 设定控制卡句柄
+	* @param handle    控制卡句柄
+	*/
 	uint8_t set_handle(ZMC_HANDLE handle);
-
+	/**
+	* @brief 设定轴号
+	* @param jointAxisIdx       关节轴
+	* @param ikPosAxisIdx       逆解位置轴
+	* @param tcpAngleAxisIdx    世界坐标系下 TCP 角度轴: 逆解姿态轴
+	* @param tcpPosAxisIdx      世界坐标系下 TCP 位置轴: 添加附加轴后的 TCP 位置
+	* @param appAxisIdx         附加轴
+	* @param camAxisIdx         凸轮轴
+	* @param swingAxisIdx       摆动轴
+	* @param connpathAxisIdx    插补矢量轴
+	*/
 	uint8_t set_axis(const std::vector<int>& jointAxisIdx, const std::vector<int>& ikPosAxisIdx, const std::vector<int>& tcpAngleAxisIdx,
 		const std::vector<int>& tcpPosAxisIdx, const std::vector<int>& appAxisIdx, const std::vector<int>& camAxisIdx, const std::vector<int>& swingAxisIdx,
 		const std::vector<int>& connpathAxisIdx);
-	/**
-	* @brief 直线摆动
-	*/
-	uint8_t disconnect();
 
 	/**
-	* @brief 触发示波器
+	* @brief 断开连接
 	*/
-	uint8_t trigger_scope();
+	uint8_t disconnect();
 
 	/**
 	* @brief 切换到正解模式：每次执行关节运动时需要绑定一次，同步计算工具坐标变化
@@ -133,6 +143,7 @@ public:
 	* @brief 设置多轴参数
 	* @param       axisList     需要获取参数的轴号列表
 	* @param       paramName    参数名称
+	* @param       paramList    参数数组
 	* @param       principal    主轴索引: -1 立即设置; >0 缓冲中设置
 	*/
 	uint8_t set_axis_param(const std::vector<int>& axisList, char* paramName, const std::vector<float>& paramList, int principal = -1);
@@ -142,12 +153,11 @@ public:
 	*/
 	uint8_t save_table(size_t startIdx, size_t num = 1, const std::string& path = "./tableData.txt");
 
-	uint8_t swing_on(float vel, const Weave& waveCfg);
+	uint8_t update_swing_table(const Weave& waveCfg);
+	uint8_t swing_on(float vel, const Weave& waveCfg, const std::vector<float>& moveDir = std::vector<float>());
 	uint8_t swing_off(float displacement = 0.0);
-	uint8_t moveJ(const std::vector<float>& jntDPos);
-	uint8_t moveJ_single();
-	uint8_t moveL(const std::vector<float>& moveCmd);
-	uint8_t moveL_single();
+
+	uint8_t moveL(const std::vector<int>& axis, const std::vector<float>& relMove);
 	uint8_t moveC(const std::vector<int>& axis, const std::vector<float>& begPoint, const std::vector<float>& midPoint, const std::vector<float>& endPoint,
 				  int imode = 0);
 
@@ -155,35 +165,28 @@ public:
 	uint8_t wlder_on(float current, float voltage);
 	uint8_t wlder_off();
 
-	/**
-	* @brief 叠加摆动的直线运动
-	* @param moveCmd    位移指令，前三个元素为 TCP 点位移，后续元素为附加轴位移
-	* @param upper      运动平面的上方向
-	*/
-	uint8_t swingL(const std::vector<float>& moveCmd, const Weave& waveCfg);
-	uint8_t swingL_(const std::vector<float>& moveCmd, const Weave& waveCfg);
-	uint8_t swingLAbs(const std::vector<float>& moveCmd, const Weave& waveCfg);
-
-	/**
-	* @brief 叠加摆动的圆弧运动
-	* @param traj    圆弧运动的中间点和终点
-	* @param end     圆弧终点
-	* @param via     圆弧中间点
-	*/
-	uint8_t swingC(const std::vector<float>& endConfig, const std::vector<float>& midConfig, const Weave& waveCfg);
-	uint8_t swingC_(const std::vector<float>& endConfig, const std::vector<float>& midConfig, const Weave& waveCfg);
-
 	uint8_t execute_discrete_trajectory_abs(DiscreteTrajectory<float>& discreteTrajectory);
 	uint8_t execute_discrete_trajectory(DiscreteTrajectory<float>& discreteTrajectory);
 
-	uint8_t swing_tri();
 	uint8_t swing_trajectory(DiscreteTrajectory<float>& discreteTrajectory, const Weave& waveCfg);
+	uint8_t swing_tri(DiscreteTrajectory<float>& discreteTrajectory, const Weave& waveCfg);
+	uint8_t swing_sin(DiscreteTrajectory<float>& discreteTrajectory, const Weave& waveCfg);
+	uint8_t swing_tri();
 
 	uint8_t arc_tracking_config(const Track& trackCfg);
 
+	/**
+	* @brief 上位机紧急停止
+	*/
 	uint8_t emergency_stop();
+	/**
+	* @brief 上位机紧急暂停
+	*/
+	uint8_t emergency_pause();
+	/**
+	* @brief 上位机紧急恢复
+	*/
+	uint8_t emergency_resume();
 
 };
 
-
-Eigen::Vector3f triangular_circumcenter(Eigen::Vector3f beg, Eigen::Vector3f mid, Eigen::Vector3f end);

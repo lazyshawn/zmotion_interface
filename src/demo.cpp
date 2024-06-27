@@ -9,24 +9,22 @@ ZauxRobot robot, robotB;
 // handle, 六个关节轴, 机械臂位置, TCP姿态, 世界坐标系下TCP位置, 附加轴, 凸轮轴, 插补矢量轴
 //ZauxRobot robotB(robot.handle_, { 0,1,2,3,4,5 }, { 9,10,11 }, { 12,13,14 }, { 15,16,17 }, { 18,19,20 }, { 36,37,38 }, { 39 });
 
-// 轨迹处理
-DiscreteTrajectory<float> discreteTrajectory;
-// 摆焊参数
-Weave waveCfg;
-// 电弧跟踪参数
-Track trackCfg;
-
 namespace shawn_test {
-	int test();
+	// 轨迹处理
+	DiscreteTrajectory<float> discreteTrajectory;
+	// 摆焊参数
+	Weave waveCfg;
+	// 电弧跟踪参数
+	Track trackCfg;
+
 	void dec_to_hex();
 	void hex_to_dec(uint16_t high, uint16_t low);
 	void format_float(std::string ifname, std::string ofname);
-	void swing();
 	void zswing();
 	// 读取并保存电流值
 	void save_current();
 }
-using namespace shawn_test;
+//using namespace shawn_test;
 
 int main() {
 	//format_float("C:\\Users\\15874\\Desktop\\SD0.BIN", "C:\\Users\\15874\\Desktop\\SD0.txt");
@@ -42,8 +40,8 @@ int main() {
 	//// 设置轴号: 六个关节轴, 机械臂坐标系下TCP位置, TCP姿态, 世界坐标系下TCP位置, 附加轴, 凸轮轴, 摆动轴, 插补矢量轴
 	//robotB.set_axis({ 0,1,2,3,4,5 }, { 7,8,9 }, { 10,11,12 }, { 7,8,9 }, {  }, { 36,37,38 }, { 40,41,42 }, { 39 });
 
-	//swing();
-	zswing();
+	shawn_test::zswing();
+	//shawn_test::save_current();
 
 	printf("Press <Enter> to exit.\n");
 	getchar();
@@ -57,19 +55,24 @@ void shawn_test::zswing() {
 	//robot.test();
 
 	// 摆焊参数
+	waveCfg.Shape = 0;
+	waveCfg.Length = 3;
+	waveCfg.Bias = 2;
 	waveCfg.Freq = 2.4;
-	waveCfg.LeftWidth = 1.5;
-	waveCfg.RightWidth = 1.5;
+	waveCfg.LeftWidth = 4;
+	waveCfg.RightWidth = 4;
 	waveCfg.Dwell_left = 0;
 	waveCfg.Dwell_right = 0;
 	waveCfg.Dwell_type = 1;
+	waveCfg.Angle_Ltype_top = 0;
+	waveCfg.Angle_Ltype_btm = 0;
 
 	// 电弧跟踪参数
 	trackCfg.Lr_enable = 0;
 	trackCfg.Ud_enable = 0;
 	robot.arc_tracking_config(trackCfg);
 
-	/* ****  **** */
+	/* **** -0.675624,0.020061,-0.736974 **** */
 	// base(0,1,2,3,4,5) moveabs(-10.9961, -11.7299, 34.4224, 0, 67.3076, -55.9961)
 	//discreteTrajectory.set_starting_point({ 1000, -200, 200, 179.9990, -28.8890, -135, 0 });
 	//discreteTrajectory.add_line({ 1000, 200, 200, 179.9990, -28.8890, 135, 0.0 }, 20);
@@ -77,9 +80,13 @@ void shawn_test::zswing() {
 	//discreteTrajectory.add_arc({ 900, -200, 200, 179.9990, -28.8890, -135, 0 }, { 950, -150, 200, 179.9990, -28.8890, 135, 0.0 });
 	//discreteTrajectory.equally_divide({ 200, 100 });
 
-	discreteTrajectory.set_starting_point({ 1537.45,-88.0971,140.622,-183.63,-42.4007,-176.326, 0.0 });
-	discreteTrajectory.add_arc({ 1379.79,-88.5931,127.114,-183.63,-46.7397,-363.264, 0.0 }, { 1457.33,-171.59,132.004,-183.63,-42.5047,-275.824, 0.0 });
-	//discreteTrajectory.add_arc({ 1530.31,-98.6249,220.496,177.605,-45.8086,529.062, 0.0 }, { 1455.21,-162.225,214.756,177.605,-45.8086,442.74, 0.0 });
+	discreteTrajectory.set_starting_point({ 1000, -200, 200, 179.9990, -28.8890, -135, 0 });
+	discreteTrajectory.add_line({ 1000, 0, 200, 179.9990, -28.8890, 135, 0.0 }, 50);
+	discreteTrajectory.add_line({ 1200, 0, 200, 179.9990, -28.8900, 45, 0.0 }, 20);
+
+	//discreteTrajectory.set_starting_point({ 1000, -200, 200, 90, 0, 0, 0 });
+	//discreteTrajectory.add_line({ 1000, -200, 400, 90, 0, 0, 0.0 }, 50);
+	//discreteTrajectory.add_line({ 1200, 0, 200, 0, 0, 0, 0.0 }, 50);
 	robot.swing_trajectory(discreteTrajectory, waveCfg);
 
 	//discreteTrajectory.set_starting_point({ 1448.45081, -176.3273, 300.09, -164.6359, -33.1196, 163.8013 });
@@ -94,40 +101,6 @@ void shawn_test::zswing() {
 	//discreteTrajectory.corner_slowdown(10);
 }
 
-void shawn_test::swing() {
-	waveCfg.Freq = 1;
-	waveCfg.Width = 5;
-	waveCfg.Dwell_left = 1000;
-	waveCfg.Dwell_right = 1000;
-	waveCfg.Dwell_type = 0;
-	
-	//robot.moveJ({ -1.8055, 7.2945, 24.1143, -2.5585, 69.5887, 5.4886, 0.0 });
-	robot.swingL({ 0, -100, 0, 0 }, waveCfg);
-	//robot.swingL({ 0, -100, 0, 0 });
-
-	//robot.moveJ({ 0, -6.8221, 14.3160, -0.0000, 55.1156, 30, 0 });
-	//robot.swingC_({ 1034.4090, -118.5060, 78.8420 }, { 1034.4090, -18.5060, 78.8420 });
-	//robot.swingC({ 1467.749, 200.06, 163.68 }, { 1267.749, -200.06, 663.68 });
-
-	//robot.moveJ({ -15.9641, 33.5979, 3.9740, 16.2066, 76.0944, 31.1940, 0.0 });
-	//robot.wait_idle(0);
-	//std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-	//std::cout << "Begin" << std::endl;
-	////robot.wlder_on(240, 30);
-	//std::this_thread::sleep_for(std::chrono::milliseconds(200));
-
-	//robot.swingC({ 1244.7410, -44.3710, -73.6200, -201.6840, -40.8120, 227.0230 }, { 1265.5150, -90.9640, -73.2900, -177.6410, -41.2930, 175.6090 });
-	////robot.swingC({ 1244.7410, -44.3710, -73.6200 }, { 1265.5150, -90.9640, -73.2900 });
-
-	//robot.wait_idle(20);
-	//std::cout << "End" << std::endl;
-	//robot.wlder_off();
-
-	//robot.inverse_kinematics();
-	//int toolAxis[] = { 20,21,22,10,11,12 }, ret = 0.0;
-	//ret = ZAux_Direct_MSphericalAbs(robot.handle_, 6, toolAxis, 1467.749, 200.06, 163.68, 1267.749, -200.06, 663.68, 0, 0, 0, 0);
-	//robot.swingC({ 884.4090, -68.5060, 78.8420 }, { 934.4090, -18.5060, 78.8420 });
-}
 
 void shawn_test::format_float(std::string ifname, std::string ofname) {
 	std::ifstream in(ifname, std::ios::binary);
@@ -155,6 +128,7 @@ void shawn_test::format_float(std::string ifname, std::string ofname) {
 	in.close();
 }
 
+
 void shawn_test::dec_to_hex() {
 	int dec = 65533;
 	uint16_t bin = dec;
@@ -166,6 +140,7 @@ void shawn_test::dec_to_hex() {
 	printf("low = %d\n", low);
 }
 
+
 void shawn_test::hex_to_dec(uint16_t high, uint16_t low) {
 	//uint16_t high = 12;
 	//uint16_t low = 12;
@@ -176,73 +151,6 @@ void shawn_test::hex_to_dec(uint16_t high, uint16_t low) {
 	std::cout << dec * 1000 / 65535.0 << std::endl;
 }
 
-int shawn_test::test() {
-	std::cout << "hello world" << std::endl;
-	ZauxRobot robot;
-
-	int ret;
-	// 默认控制器 IP地址 192.168.0.11, 仿真器 IP 地址 127.0.0.1
-	char *ip_addr = (char *)"127.0.0.1";
-	// 控制器句柄
-	ZMC_HANDLE handle = NULL;
-	// 通过网口连接控制器
-	if (ERR_SUCCESS != ZAux_OpenEth(ip_addr, &handle))	{
-		printf("Connect controller failed!\nPress <Enter> exist!\n");
-		handle = NULL;
-		getchar();
-		return -1;
-	}
-	printf("控制器连接成功！\n");
-
-	// bas 程序路径
-	std::string basPath = "D:\\CIMC\\zmotion\\robot_configuration.bas";
-	// 加载 bas 程序
-	if (ZAux_BasDown(handle, basPath.c_str(), 0) != 0) {
-		printf("Error.");
-		return 0;
-	}
-	// 等待 bas 程序下载
-	Sleep(1000);
-	// 轴号
-	int m_nAxis = 0;
-
-	// 单位正弦曲线数据写入 
-	std::vector<float> sinTable(100);
-	for (int i = 0; i < 100; ++i) {
-		sinTable[i] = sin(2 * M_PI * i / 99);
-	}
-
-	int firstAxis = 0, secondAxis = 1;
-	// 把凸轮表数据写入 Table 寄存器值
-	ZAux_Direct_SetTable(handle, 200, 100, sinTable.data());
-	// 触发示波器
-	ZAux_Trigger(handle);
-
-	// 切换到逆解模式：每次执行工具坐标系运动时需要绑定一次，同步计算关节坐标变化
-	//ZAux_Direct_Connframe(handle, robot.jointAxisIdx_.size(), robot.jointAxisIdx_.data(), 6, 0, robot.toolAxisIdx_.size(), robot.toolAxisIdx_.data());
-
-	// 参考轴 1 运动到 100 位置时，跟随轴 0启动凸轮表运动
-	/**
-	* @param handle 句柄
-	* @param 凸轮轴轴号
-	* @param 凸轮表起始索引
-	* @param 凸轮表终止索引
-	* @param 位置比例
-	* @param 一个凸轮运动周期的距离，运动周期 = 距离 / 凸轮轴速度
-	* @param 参考轴轴号
-	* @param 参考轴的关联方式
-	* @param 参考轴位移
-	*/
-	ZAux_Direct_Cambox(handle, 6, 200, 299, 10000, 100, 8, 4, 0);
-
-	ZAux_Direct_Single_Move(handle, 8, -500);
-
-	Sleep(500);
-	ret = ZAux_Close(handle);    //关闭连接 
-	printf("connection closed!\n");
-	handle = NULL;
-	return 0;
-}
 
 void shawn_test::save_current() {
 	// 读取点数
@@ -285,3 +193,4 @@ void shawn_test::save_current() {
 
 	return;
 }
+
