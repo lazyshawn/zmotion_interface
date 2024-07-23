@@ -7,6 +7,138 @@
 
 #include<iostream>
 
+#include"FsCraftDef.h"
+
+
+/**
+* @brief  计算等效的 Rzyx 欧拉角
+* @param  endEuler    给定欧拉角 <Rx, Ry, Rz>
+* @return 等效的 Rzyx 欧拉角
+*/
+template <typename T>
+Eigen::Matrix<T, 3, 1> get_equivalent_zyx_euler(const Eigen::Matrix<T, 3, 1>& endEuler) {
+
+	Eigen::Matrix<T, 3, 1> equivEuler = endEuler;
+
+	while (std::fabs(equivEuler[1]) - 180 > 0) {
+		equivEuler[1] += equivEuler[1] > 0 ? -360 : 360;
+	}
+
+	// Ry == 90
+	if (endEuler[1] == 90) {
+		equivEuler[0] = 0;
+		equivEuler[2] = endEuler[2] - endEuler[0];
+	}
+	// Ry == -90
+	else if (endEuler[1] == -90) {
+		equivEuler[0] = 0;
+		equivEuler[2] = endEuler[2] + endEuler[0];
+	}
+	else {
+		equivEuler[0] = endEuler[0] + 180;
+		equivEuler[1] = 180 - endEuler[1];
+		equivEuler[2] = endEuler[2] + 180;
+	}
+	// wrap to (-pi, pi]
+	for (size_t i = 0; i < 3; ++i) {
+		while (std::fabs(equivEuler[i]) - 180 > 0) {
+			equivEuler[i] += equivEuler[i] > 0 ? -360 : 360;
+		}
+	}
+
+	return equivEuler;
+}
+
+/**
+* @brief  计算两组 Rzyx 欧拉角之间的相对运动距离
+* @param  begEuler           起点欧拉角 <Rx, Ry, Rz>
+* @param  endEuler           绕 y 转角(deg)
+* @param  chooseMimumDist    绕 z 转角(deg)
+* @return 相对运动距离
+*/
+template <typename T>
+Eigen::Matrix<T, 3, 1> get_zyx_euler_distance(Eigen::Matrix<T, 3, 1>& begEuler, Eigen::Matrix<T, 3, 1>& endEuler, bool chooseMimumDist = 1) {
+	Eigen::Matrix<T, 3, 1> ans(0, 0, 0);
+
+	// wrap to (-pi, pi]
+	for (size_t i = 0; i < 3; ++i) {
+		while (std::fabs(begEuler[i]) - 180 > 0) {
+			begEuler[i] += begEuler[i] > 0 ? -360 : 360;
+		}
+		while (std::fabs(endEuler[i]) - 180 > 0) {
+			endEuler[i] += endEuler[i] > 0 ? -360 : 360;
+		}
+	}
+
+	// equivalent of endEuler
+	Eigen::Matrix<T, 3, 1> equivEuler = get_equivalent_zyx_euler(endEuler);
+	if (endEuler[1] == 90) {
+		equivEuler[0] = (equivEuler[2] > 0) ? (std::min)(begEuler[0], begEuler[2]) : (std::max)(begEuler[0], begEuler[2]);
+		equivEuler[2] += equivEuler[0];
+	}
+	else if (endEuler[1] == -90) {
+		T sumQ = endEuler[2] + endEuler[0];
+		equivEuler[0] = begEuler[0];
+		equivEuler[2] -= equivEuler[0];
+	}
+	// wrap to (-pi, pi]
+	for (size_t i = 0; i < 3; ++i) {
+		while (std::fabs(equivEuler[i]) - 180 > 0) {
+			equivEuler[i] += equivEuler[i] > 0 ? -360 : 360;
+		}
+	}
+
+	// 欧拉角相对值
+	Eigen::Matrix<T, 3, 1> endRel(0, 0, 0), equivRel(0, 0, 0);
+	T endSum = 0.0, equivSum = 0.0;
+	for (size_t i = 0; i < 3; ++i) {
+		T directDist = endEuler[i] - begEuler[i];
+		T hopDist = 360 - std::fabs(endEuler[i]) - std::fabs(begEuler[i]);
+		if (std::fabs(directDist) <= hopDist) {
+			endRel[i] = directDist;
+		}
+		else {
+			// 此时 begEuler[i] ！= 0 成立
+			endRel[i] = begEuler[i] < 0 ? -hopDist : hopDist;
+		}
+		endSum += std::fabs(endRel[i]);
+
+		directDist = equivEuler[i] - begEuler[i];
+		hopDist = 360 - std::fabs(equivEuler[i]) - std::fabs(begEuler[i]);
+		if (std::fabs(directDist) <= hopDist) {
+			equivRel[i] = directDist;
+		}
+		else {
+			equivRel[i] = begEuler[i] < 0 ? -hopDist : hopDist;
+		}
+		equivSum += std::fabs(equivRel[i]);
+	}
+
+	// 选择最短 / 最长的相对运动距离
+	if (chooseMimumDist) {
+		//ans = endSum < equivSum ? endRel : equivRel;
+		if (endSum < equivSum) {
+			ans = endRel;
+		}
+		else {
+			ans = equivRel;
+			endEuler = equivEuler;
+		}
+	}
+	else {
+		//ans = endSum < equivSum ? equivRel : endRel;
+		if (endSum > equivSum) {
+			ans = endRel;
+		}
+		else {
+			ans = equivRel;
+			endEuler = equivEuler;
+		}
+	}
+
+	return ans;
+}
+
 
 template <typename T = float>
 class DiscreteTrajectory {
@@ -18,8 +150,13 @@ public:
 	//! 轨迹信息    直线    方向(0:2),    -直线长度(3), null(4:6),     速度(7)
 	//              圆弧    圆心坐标(0:2),+圆弧长度(3), 旋转矢量(4:6), 速度(7)
 	std::list<std::vector<T>> trajInfo;
-	//! 最大角速度(deg/s)
-	//T angularVel = 10;
+
+	//! 摆焊参数
+	std::list<Weave> waveInfo;
+	//! 跟踪参数
+	std::list<Track> trackInfo;
+	//! 焊接参数
+	std::list<Arc_WeldingParaItem> weldInfo;
 
 public:
 	DiscreteTrajectory() {};
@@ -88,6 +225,13 @@ public:
 		
 		return 0;
 	}
+	uint8_t add_line(const std::vector<T>& pnt, const Weave& waveCfg, const Track& trackCfg, const Arc_WeldingParaItem& weldCfg) {
+		add_line(pnt);
+
+		waveInfo.push_back(waveCfg);
+		trackInfo.push_back(trackCfg);
+		weldInfo.push_back(weldCfg);
+	}
 
 	/**
 	* @brief  记录圆弧轨迹
@@ -130,7 +274,13 @@ public:
 
 		return 0;
 	}
+	uint8_t add_arc(const std::vector<T>& end, const std::vector<T>& mid, const Weave& waveCfg, const Track& trackCfg, const Arc_WeldingParaItem& weldCfg) {
+		add_arc(end, mid);
 
+		waveInfo.push_back(waveCfg);
+		trackInfo.push_back(trackCfg);
+		weldInfo.push_back(weldCfg);
+	}
 	/**
 	* @brief  拐角过渡
 	* @param  end    圆弧终点
@@ -217,23 +367,27 @@ public:
 	uint8_t corner_slowdown(T angularVel) {
 		// 遍历轨迹
 		auto nodePointIte = nodePoint.begin();
-		//auto midPointIte = midPoint.begin();
+		auto midPointIte = midPoint.begin();
 		auto infoIte = trajInfo.begin();
 
 		while (infoIte != trajInfo.end()) {
 			std::vector<float> curBuffer = *(nodePointIte++);
 
-			Eigen::Matrix<T, 3, 1> begEuler, endEuler, relEuler;
-			// 起点过渡总旋转角度
-			begEuler = Eigen::Matrix<T, 3, 1>(curBuffer[3], curBuffer[4], curBuffer[5]);
-			endEuler = Eigen::Matrix<T, 3, 1>((*nodePointIte)[3], (*nodePointIte)[4], (*nodePointIte)[5]);
-			relEuler = get_zyx_euler_distance(begEuler, endEuler);
+			// 欧拉角转换到相对运动: beg -> mid -> end
+			Eigen::Vector3f begEuler = Eigen::Vector3f(curBuffer[3], curBuffer[4], curBuffer[5]);
+			Eigen::Vector3f endEuler = Eigen::Vector3f((*midPointIte)[3], (*midPointIte)[4], (*midPointIte)[5]);
+			Eigen::Vector3f relEuler = get_zyx_euler_distance(begEuler, endEuler);
+			begEuler = endEuler;
+			endEuler = Eigen::Vector3f((*nodePointIte)[3], (*nodePointIte)[4], (*nodePointIte)[5]);
+			relEuler += get_zyx_euler_distance(begEuler, endEuler);
+
 			T sumAngle = std::sqrt(relEuler[0]* relEuler[0] + relEuler[1]* relEuler[1] + relEuler[2]* relEuler[2]);
 			// 速度修正
 			if (sumAngle / angularVel > std::fabs((*infoIte)[3]) / (*infoIte)[7]) {
 				(*infoIte)[7] = angularVel * std::fabs((*infoIte)[3]) / sumAngle;
 			}
 
+			midPointIte++;
 			infoIte++;
 		}
 
@@ -571,130 +725,3 @@ const Eigen::Matrix<T, 3, 1> DiscreteTrajectory<T>::unitY = Eigen::Matrix<T, 3, 
 template <typename T>
 const Eigen::Matrix<T, 3, 1> DiscreteTrajectory<T>::unitZ = Eigen::Matrix<T, 3, 1>(0, 0, 1);
 
-/**
-* @brief  计算两组 Rzyx 欧拉角之间的相对运动距离
-* @param  begEuler           起点欧拉角 <Rx, Ry, Rz>
-* @param  endEuler           绕 y 转角(deg)
-* @param  chooseMimumDist    绕 z 转角(deg)
-* @return 相对运动距离
-*/
-template <typename T>
-Eigen::Matrix<T, 3, 1> get_zyx_euler_distance(Eigen::Matrix<T, 3, 1>& begEuler, Eigen::Matrix<T, 3, 1>& endEuler, bool chooseMimumDist = 1) {
-	Eigen::Matrix<T, 3, 1> ans(0, 0, 0);
-
-	// wrap to (-pi, pi]
-	for (size_t i = 0; i < 3; ++i) {
-		while (std::fabs(begEuler[i]) - 180 > 0) {
-			begEuler[i] += begEuler[i] > 0 ? -360 : 360;
-		}
-		while (std::fabs(endEuler[i]) - 180 > 0) {
-			endEuler[i] += endEuler[i] > 0 ? -360 : 360;
-		}
-	}
-
-	// equivalent of endEuler
-	Eigen::Matrix<T, 3, 1> equivEuler = get_equivalent_zyx_euler(endEuler);
-	if (endEuler[1] == 90) {
-		equivEuler[0] = (equivEuler[2] > 0) ? (std::min)(begEuler[0], begEuler[2]) : (std::max)(begEuler[0], begEuler[2]);
-		equivEuler[2] += equivEuler[0];
-	}
-	else if (endEuler[1] == -90) {
-		T sumQ = endEuler[2] + endEuler[0];
-		equivEuler[0] = begEuler[0];
-		equivEuler[2] -= equivEuler[0];
-	}
-	// wrap to (-pi, pi]
-	for (size_t i = 0; i < 3; ++i) {
-		while (std::fabs(equivEuler[i]) - 180 > 0) {
-			equivEuler[i] += equivEuler[i] > 0 ? -360 : 360;
-		}
-	}
-
-	// 欧拉角相对值
-	Eigen::Matrix<T, 3, 1> endRel(0,0,0), equivRel(0,0,0);
-	T endSum = 0.0, equivSum = 0.0;
-	for (size_t i = 0; i < 3; ++i) {
-		T directDist = endEuler[i] - begEuler[i];
-		T hopDist = 360 - std::fabs(endEuler[i]) - std::fabs(begEuler[i]);
-		if (std::fabs(directDist) <= hopDist) {
-			endRel[i] = directDist;
-		} else {
-			// 此时 begEuler[i] ！= 0 成立
-			endRel[i] = begEuler[i] < 0 ? -hopDist : hopDist;
-		}
-		endSum += std::fabs(endRel[i]);
-
-		directDist = equivEuler[i] - begEuler[i];
-		hopDist = 360 - std::fabs(equivEuler[i]) - std::fabs(begEuler[i]);
-		if (std::fabs(directDist) <= hopDist) {
-			equivRel[i] = directDist;
-		}
-		else {
-			equivRel[i] = begEuler[i] < 0 ? -hopDist : hopDist;
-		}
-		equivSum += std::fabs(equivRel[i]);
-	}
-
-	// 选择最短 / 最长的相对运动距离
-	if (chooseMimumDist) {
-		//ans = endSum < equivSum ? endRel : equivRel;
-		if (endSum < equivSum) {
-			ans = endRel;
-		}
-		else {
-			ans = equivRel;
-			endEuler = equivEuler;
-		}
-	}
-	else {
-		//ans = endSum < equivSum ? equivRel : endRel;
-		if (endSum > equivSum) {
-			ans = endRel;
-		}
-		else {
-			ans = equivRel;
-			endEuler = equivEuler;
-		}
-	}
-
-	return ans;
-}
-
-/**
-* @brief  计算等效的 Rzyx 欧拉角
-* @param  endEuler    给定欧拉角 <Rx, Ry, Rz>
-* @return 等效的 Rzyx 欧拉角
-*/
-template <typename T>
-Eigen::Matrix<T, 3, 1> get_equivalent_zyx_euler(const Eigen::Matrix<T, 3, 1>& endEuler) {
-
-	Eigen::Matrix<T, 3, 1> equivEuler = endEuler;
-
-	while (std::fabs(equivEuler[1]) - 180 > 0) {
-		equivEuler[1] += equivEuler[1] > 0 ? -360 : 360;
-	}
-
-	// Ry == 90
-	if (endEuler[1] == 90) {
-		equivEuler[0] = 0;
-		equivEuler[2] = endEuler[2] - endEuler[0];
-	}
-	// Ry == -90
-	else if (endEuler[1] == -90) {
-		equivEuler[0] = 0;
-		equivEuler[2] = endEuler[2] + endEuler[0];
-	}
-	else {
-		equivEuler[0] = endEuler[0] + 180;
-		equivEuler[1] = 180 - endEuler[1];
-		equivEuler[2] = endEuler[2] + 180;
-	}
-	// wrap to (-pi, pi]
-	for (size_t i = 0; i < 3; ++i) {
-		while (std::fabs(equivEuler[i]) - 180 > 0) {
-			equivEuler[i] += equivEuler[i] > 0 ? -360 : 360;
-		}
-	}
-
-	return equivEuler;
-}

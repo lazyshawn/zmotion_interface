@@ -48,19 +48,21 @@ public:
 	// 关节轴
 	std::vector<int> jointAxisIdx_ = { 0,1,2,3,4,5 };
 	// 逆解位置轴
-	std::vector<int> ikPosAxisIdx_ = { 7,8,9 };
+	std::vector<int> ikPosAxisIdx_ = { 9,10,11 };
 	// TCP 姿态轴
-	std::vector<int> tcpAngleAxisIdx_ = { 10,11,12 };
+	std::vector<int> tcpAngleAxisIdx_ = { 12,13,14 };
 	// TCP 位置轴
-	std::vector<int> tcpPosAxisIdx_ = { 20, 21, 22 };
+	std::vector<int> tcpPosAxisIdx_ = { 18, 19, 20 };
 	// 附加轴
-	std::vector<int> appAxisIdx_ = { 6,30,31 };
+	std::vector<int> appAxisIdx_ = { 6,7,8 };
 	// 凸轮轴
-	std::vector<int> camAxisIdx_ = { 23, 24, 25 };
+	std::vector<int> camAxisIdx_ = { 36,37,38 };
 	// 摆动轴
-	std::vector<int> swingAxisIdx_ = { 26,27,28 };
+	std::vector<int> swingAxisIdx_ = { 40,41,42 };
 	// 插补矢量轴
-	std::vector<int> connpathAxisIdx_ = { 15 };
+	std::vector<int> connpathAxisIdx_ = { 39 };
+	// 过渡轴
+	std::vector<int> transAxisIdx_ = { 18,19,20,21,22,23,24,25,26 };
 
 	// 摆动标志位索引
 	size_t swingFlagIdx = 1000;
@@ -70,7 +72,7 @@ public:
 
 
 public:
-	ZauxRobot();
+	ZauxRobot() {}
 	ZauxRobot(const std::vector<int>& jointAxisIdx, const std::vector<int>& ikPosAxisIdx, const std::vector<int>& tcpAngleAxisIdx,
 		const std::vector<int>& tcpPosAxisIdx, const std::vector<int>& appAxisIdx, const std::vector<int>& camAxisIdx, const std::vector<int>& swingAxisIdx,
 		const std::vector<int>& connpathAxisIdx
@@ -78,9 +80,10 @@ public:
 	/**
 	* @brief 通过网口连接控制器
 	*/
-	uint8_t connect_eth(char *ip_addr);
-	uint8_t connect_pci(uint32 cardNum);
-	uint8_t lazy_connect();
+	int32 connect_eth(char *ip_addr);
+	int32 connect_pci(uint32 cardNum);
+	int32 lazy_connect();
+	int32 connect(std::string addr);
 
 	/**
 	* @brief 烧录 basic 程序到控制器
@@ -89,7 +92,7 @@ public:
 	         0          烧录到 RAM
 			 1          烧录到 ROM
 	*/
-	uint8_t load_basic_pragma(const char *basPath, uint32_t mode = 0);
+	int32 load_basic_pragma(const char *basPath, uint32_t mode = 0);
 	//uint8_t load_basic_project(const char *basPath, uint32_t mode = 0);
 
 	//uint8_t enable_zaux_log(int logMode);
@@ -98,7 +101,7 @@ public:
 	* @brief 设定控制卡句柄
 	* @param handle    控制卡句柄
 	*/
-	uint8_t set_handle(ZMC_HANDLE handle);
+	int32 set_handle(ZMC_HANDLE handle);
 	/**
 	* @brief 设定轴号
 	* @param jointAxisIdx       关节轴
@@ -110,34 +113,34 @@ public:
 	* @param swingAxisIdx       摆动轴
 	* @param connpathAxisIdx    插补矢量轴
 	*/
-	uint8_t set_axis(const std::vector<int>& jointAxisIdx, const std::vector<int>& ikPosAxisIdx, const std::vector<int>& tcpAngleAxisIdx,
+	int32 set_axis(const std::vector<int>& jointAxisIdx, const std::vector<int>& ikPosAxisIdx, const std::vector<int>& tcpAngleAxisIdx,
 		const std::vector<int>& tcpPosAxisIdx, const std::vector<int>& appAxisIdx, const std::vector<int>& camAxisIdx, const std::vector<int>& swingAxisIdx,
 		const std::vector<int>& connpathAxisIdx);
 
 	/**
 	* @brief 断开连接
 	*/
-	uint8_t disconnect();
+	int32 disconnect();
 
 	/**
 	* @brief 切换到正解模式：每次执行关节运动时需要绑定一次，同步计算工具坐标变化
 	*/
-	uint8_t forward_kinematics();
+	int32 forward_kinematics(int delay = 1e3);
 
 	/**
 	* @brief 切换到逆解模式：每次执行工具坐标系运动时需要绑定一次，同步计算关节坐标变化
 	*/
-	uint8_t inverse_kinematics();
+	int32 inverse_kinematics(int delay = 1e3);
 
-	uint8_t wait_idle(int axisIdx);
+	int32 wait_idle(int axisIdx);
 
 	/**
-	* @brief  读取多轴的当前和缓冲中运动的最终位置
+	* @brief  读取多轴参数
 	* @param       axisList     需要获取参数的轴号列表
 	* @param       paramName    参数名称
 	* @param[out]  paramList    返回的参数列表
 	*/
-	uint8_t get_axis_param(const std::vector<int>& axisList, char* paramName, std::vector<float>& paramList);
+	int32 get_axis_param(const std::vector<int>& axisList, char* paramName, std::vector<float>& paramList);
 
 	/**
 	* @brief 设置多轴参数
@@ -146,47 +149,87 @@ public:
 	* @param       paramList    参数数组
 	* @param       principal    主轴索引: -1 立即设置; >0 缓冲中设置
 	*/
-	uint8_t set_axis_param(const std::vector<int>& axisList, char* paramName, const std::vector<float>& paramList, int principal = -1);
+	int32 set_axis_param(const std::vector<int>& axisList, char* paramName, const std::vector<float>& paramList, int principal = -1);
 
 	/**
 	* @brief 保存table数据到本地
 	*/
-	uint8_t save_table(size_t startIdx, size_t num = 1, const std::string& path = "./tableData.txt");
+	int32 save_table(size_t startIdx, size_t num = 1, const std::string& path = "./tableData.txt");
 
-	uint8_t update_swing_table(const Weave& waveCfg);
-	uint8_t swing_on(float vel, const Weave& waveCfg, const std::vector<float>& moveDir = std::vector<float>());
-	uint8_t swing_off(float displacement = 0.0);
+	int32 update_swing_table(const Weave& waveCfg);
+	int32 swing_on(float vel, const Weave& waveCfg, const std::vector<float>& toolDir = std::vector<float>());
+	int32 swing_off(float displacement = 0.0);
 
-	uint8_t moveL(const std::vector<int>& axis, const std::vector<float>& relMove);
-	uint8_t moveC(const std::vector<int>& axis, const std::vector<float>& begPoint, const std::vector<float>& midPoint, const std::vector<float>& endPoint,
+	/**
+	* @brief 轴点动
+	* @param       idx     运动轴号
+	* @param       type    运动类型
+					  0      运动结束
+					  ±1    关节正/负向运动
+					  ±2    世界坐标系正/负向运动
+					  ±3    工具坐标系正/负向运动
+	* @param       dir     运动方向
+	*/
+	int32 jog_moving(int idx, int type, int dir);
+
+	/**
+	* @brief movePtp
+	* @param       axis          关节运动轴号
+	* @param       relEndMove    相对运动距离
+	* @param       speedRatio    速度比率
+	*/
+	int32 move_ptp(const std::vector<float>& relEndMove, float speedRatio = 1.0);
+	int32 move_ptp_abs(const std::vector<float>& endMove, float speedRatio = 1.0);
+
+	/**
+	* @brief moveJ
+	* @param       axis          关节运动轴号
+	* @param       relEndMove    相对运动距离
+	* @param       speedRatio    速度比率
+	*/
+	int32 moveJ(const std::vector<float>& relEndMove, float speedRatio = 1.0);
+	int32 moveJ(const std::vector<int>& axis, const std::vector<float>& relEndMove, float speedRatio = 1.0);
+
+	/**
+	* @brief moveJ_abs
+	* @param      axis          关节运动轴号
+	* @param      endMove       绝对运动位置
+	* @param      speedRatio    速度比率
+	*/
+	int32 moveJ_abs(const std::vector<float>& endMove, float speedRatio = 1.0);
+	int32 moveJ_abs(const std::vector<int>& axis, const std::vector<float>& endMove, float speedRatio = 1.0);
+
+	int32 moveL(const std::vector<int>& axis, const std::vector<float>& relMove);
+	int32 moveC(const std::vector<int>& axis, const std::vector<float>& begPoint, std::vector<float>& midPoint, std::vector<float>& endPoint,
 				  int imode = 0);
 
 	// 焊机控制
-	uint8_t wlder_on(float current, float voltage);
-	uint8_t wlder_off();
+	int32 wlder_on(float current, float voltage);
+	int32 wlder_off();
 
-	uint8_t execute_discrete_trajectory_abs(DiscreteTrajectory<float>& discreteTrajectory);
-	uint8_t execute_discrete_trajectory(DiscreteTrajectory<float>& discreteTrajectory);
+	int32 execute_discrete_trajectory_abs(DiscreteTrajectory<float>& discreteTrajectory);
+	int32 execute_discrete_trajectory(DiscreteTrajectory<float>& discreteTrajectory);
 
-	uint8_t swing_trajectory(DiscreteTrajectory<float>& discreteTrajectory, const Weave& waveCfg);
-	uint8_t swing_tri(DiscreteTrajectory<float>& discreteTrajectory, const Weave& waveCfg);
-	uint8_t swing_sin(DiscreteTrajectory<float>& discreteTrajectory, const Weave& waveCfg);
-	uint8_t swing_tri();
+	int32 swing_trajectory(DiscreteTrajectory<float>& discreteTrajectory, const Weave& waveCfg);
+	int32 swing_tri(DiscreteTrajectory<float>& discreteTrajectory, const Weave& waveCfg);
+	int32 swing_sin(DiscreteTrajectory<float>& discreteTrajectory, const Weave& waveCfg);
+	int32 swing_tri();
 
-	uint8_t arc_tracking_config(const Track& trackCfg);
+	int32 arc_tracking_config(const Track& trackCfg);
 
+	int32 handle_zaux_error(int32 errCode);
 	/**
 	* @brief 上位机紧急停止
 	*/
-	uint8_t emergency_stop();
+	int32 emergency_stop();
 	/**
 	* @brief 上位机紧急暂停
 	*/
-	uint8_t emergency_pause();
+	int32 emergency_pause();
 	/**
 	* @brief 上位机紧急恢复
 	*/
-	uint8_t emergency_resume();
+	int32 emergency_resume();
 
 };
 

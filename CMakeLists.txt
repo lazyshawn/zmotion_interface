@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.12)
-project(RobotAlgo VERSION 1.0.0)
+project(ZauxRobot VERSION 1.0.0)
 
 if(WIN32)
   # create symbol for exporting lib for dynmic library
@@ -45,15 +45,8 @@ add_executable(demo
   src/demo.cpp
 )
 
-#set_target_properties(demo PROPERTIES
-#  INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/lib/zmotion"
-#  LINK_DIRECTORIES "${CMAKE_SOURCE_DIR}/lib/zmotion"
-#)
-
 # Then, link libraries
 target_link_libraries(demo PUBLIC
-#  zauxdll
-#  zmotion
   zmotion_interface
 )
 
@@ -67,21 +60,30 @@ target_include_directories(demo PUBLIC
 # Install package
 ###############################################################################
 # Install public include files
-install(DIRECTORY include/path_planning
+install(DIRECTORY include/
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} FILES_MATCHING PATTERN "*.hpp" PATTERN "*.h"
+)
+install(DIRECTORY lib/zmotion/
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} FILES_MATCHING PATTERN "*.hpp" PATTERN "*.h"
 )
 
 # We add `yourlibrary` target into the export set.
 # The export set will contain all targets to be imported by the other project.
 # It also installs the library to the install script so they are installed:
-set(path_planning_libs
-  demo
+set(zaux_robot_libs
+  zmotion_interface
 )
-install(TARGETS ${path_planning_libs} EXPORT RobotAlgoTargets
+install(TARGETS ${zaux_robot_libs} EXPORT ZauxRobotTargets
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
+
+include(${CMAKE_SOURCE_DIR}/cmake/ExportPackage.cmake)
+
+
+
+
 set(zmotion_libs
   ${CMAKE_SOURCE_DIR}/lib/zmotion/zauxdll.lib
   ${CMAKE_SOURCE_DIR}/lib/zmotion/zauxdll.dll

@@ -83,7 +83,7 @@ public:
 	double Angle_Ltype_top = 30;			//上仰角度
 	double Angle_Ltype_btm = 30;			//下仰角度
 	double Phase = 0;					    //波形反相: 0 正常, 1 反向   
-	double Offset = 0;					
+	double Offset = 0;
 	double Invert = 0;
 	double IsWeave_3D = 1;				    //3D摆弧
 	double LeftWidth = 4;					//左振幅

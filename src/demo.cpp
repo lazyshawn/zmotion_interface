@@ -58,12 +58,12 @@ void shawn_test::zswing() {
 	waveCfg.Shape = 0;
 	waveCfg.Length = 3;
 	waveCfg.Bias = 2;
-	waveCfg.Freq = 2.4;
-	waveCfg.LeftWidth = 4;
-	waveCfg.RightWidth = 4;
-	waveCfg.Dwell_left = 0;
-	waveCfg.Dwell_right = 0;
-	waveCfg.Dwell_type = 1;
+	waveCfg.Freq = 1.0;
+	waveCfg.LeftWidth = 3.2;
+	waveCfg.RightWidth = 3.2;
+	waveCfg.Dwell_left = 100;
+	waveCfg.Dwell_right = 100;
+	waveCfg.Dwell_type = 0;
 	waveCfg.Angle_Ltype_top = 0;
 	waveCfg.Angle_Ltype_btm = 0;
 
@@ -72,7 +72,7 @@ void shawn_test::zswing() {
 	trackCfg.Ud_enable = 0;
 	robot.arc_tracking_config(trackCfg);
 
-	/* **** -0.675624,0.020061,-0.736974 **** */
+	/* ****  **** */
 	// base(0,1,2,3,4,5) moveabs(-10.9961, -11.7299, 34.4224, 0, 67.3076, -55.9961)
 	//discreteTrajectory.set_starting_point({ 1000, -200, 200, 179.9990, -28.8890, -135, 0 });
 	//discreteTrajectory.add_line({ 1000, 200, 200, 179.9990, -28.8890, 135, 0.0 }, 20);
@@ -80,18 +80,15 @@ void shawn_test::zswing() {
 	//discreteTrajectory.add_arc({ 900, -200, 200, 179.9990, -28.8890, -135, 0 }, { 950, -150, 200, 179.9990, -28.8890, 135, 0.0 });
 	//discreteTrajectory.equally_divide({ 200, 100 });
 
-	discreteTrajectory.set_starting_point({ 1000, -200, 200, 179.9990, -28.8890, -135, 0 });
-	discreteTrajectory.add_line({ 1000, 0, 200, 179.9990, -28.8890, 135, 0.0 }, 50);
-	discreteTrajectory.add_line({ 1200, 0, 200, 179.9990, -28.8900, 45, 0.0 }, 20);
+	discreteTrajectory.set_starting_point({ 1000, -200, 200, 179.9990, -28.8890, 135, 0 });
+	discreteTrajectory.add_line({ 1000, 0, 200, 179.9990, -28.8890, 135, 0.0 }, 10);
+	//discreteTrajectory.add_line({ 1000, 200, 200, 179.9990, -28.8890, 135, 0.0 }, 20);
+	//discreteTrajectory.add_line({ 1200, 0, 200, 179.9990, -28.8900, 45, 0.0 }, 50);
 
-	//discreteTrajectory.set_starting_point({ 1000, -200, 200, 90, 0, 0, 0 });
-	//discreteTrajectory.add_line({ 1000, -200, 400, 90, 0, 0, 0.0 }, 50);
-	//discreteTrajectory.add_line({ 1200, 0, 200, 0, 0, 0, 0.0 }, 50);
-	robot.swing_trajectory(discreteTrajectory, waveCfg);
-
-	//discreteTrajectory.set_starting_point({ 1448.45081, -176.3273, 300.09, -164.6359, -33.1196, 163.8013 });
-	//discreteTrajectory.add_line({ 1448.44995, -176.34399, 79.5148, 172.42098, -35.4406, -170.82 }, 7);
-	//robot.execute_discrete_trajectory_abs(discreteTrajectory);
+	//discreteTrajectory.set_starting_point({ -22.873100,-1467.822754,-17.759701,178.017395,-43.356602,-46.023201,-85.892502, 0 });
+	//discreteTrajectory.add_arc({ 759.797,97.0257,93.728,168.197,-46.3449,78.4946, 0 }, { 720.393,158.951,92.2991,-179.413,-48.6368,1.0271, 0 }, 20);
+	//discreteTrajectory.add_line({ -22.873072, -1467.822754, -17.759697, -1.982573, -136.643463, 133.976715, -85.892509, 0.0 }, 25, 5);
+	//robot.swing_trajectory(discreteTrajectory, waveCfg);
 
 	/* ****  **** */
 	//robot.swing_tri();
@@ -99,6 +96,9 @@ void shawn_test::zswing() {
 	/* ****  **** */
 	//discreteTrajectory.corner_transition();
 	//discreteTrajectory.corner_slowdown(10);
+	//robot.execute_discrete_trajectory_abs(discreteTrajectory);
+	//robot.swing_trajectory(discreteTrajectory, waveCfg);
+	robot.move_ptp_abs({ 100,120,80,50,80,30 }, 0.5);
 }
 
 
@@ -160,18 +160,18 @@ void shawn_test::save_current() {
 	std::vector<float> tableData(maxNum, 0);
 
 	// 周期开始的索引
-	saverIdx = 5000;
+	saverIdx = 100000;
 	ZAux_Direct_GetTable(robot.handle_, saverIdx, 1, (float*)&tmpTable);
 	numPoint = std::floor(tmpTable);
-	numPoint = numPoint < 0 ? 0 : numPoint;
+	numPoint = numPoint < 0 ? 0 : numPoint % 5000;
 	printf("num of sin period: %d\n", numPoint);
 	robot.save_table(saverIdx+1, numPoint, "./arc_tracking/SD0_idx.txt");
 
 	// 原始电流值
-	saverIdx = 10000;
+	saverIdx = 105000;
 	ZAux_Direct_GetTable(robot.handle_, saverIdx, 1, (float*)&tmpTable);
 	numPoint = std::floor(tmpTable);
-	numPoint = numPoint < 0 ? 0 : numPoint;
+	numPoint = numPoint < 0 ? 0 : numPoint % 5000;
 	printf("num of raw current: %d\n", numPoint);
 	robot.save_table(saverIdx + 1, numPoint, "./arc_tracking/SD0.txt");
 
@@ -179,15 +179,15 @@ void shawn_test::save_current() {
 	saverIdx = 110000;
 	ZAux_Direct_GetTable(robot.handle_, saverIdx, 1, (float*)&tmpTable);
 	numPoint = std::floor(tmpTable);
-	numPoint = numPoint < 0 ? 0 : numPoint;
+	numPoint = numPoint < 0 ? 0 : numPoint % 5000;
 	printf("num of fined current: %d\n", numPoint);
 	robot.save_table(saverIdx + 1, numPoint, "./arc_tracking/SD0_f.txt");
 
 	// 滤波后的电压值
-	saverIdx = 210000;
+	saverIdx = 115000;
 	ZAux_Direct_GetTable(robot.handle_, saverIdx, 1, (float*)&tmpTable);
 	numPoint = std::floor(tmpTable);
-	numPoint = numPoint < 0 ? 0 : numPoint;
+	numPoint = numPoint < 0 ? 0 : numPoint % 5000;
 	printf("num of voltage: %d\n", numPoint);
 	robot.save_table(saverIdx + 1, numPoint, "./arc_tracking/SD0_v.txt");
 
