@@ -140,6 +140,63 @@ Eigen::Matrix<T, 3, 1> get_zyx_euler_distance(Eigen::Matrix<T, 3, 1>& begEuler, 
 }
 
 
+/**
+* @brief  空间轨迹的运动参数
+*/
+template <typename T = float>
+class TrajectoryConfig {
+private:
+	//! 轨迹长度: 直线- / 圆弧+
+	T dist;
+	//! 轨迹节点: 直线起点 / 圆弧圆心
+	Eigen::Matrix<T, 3, 1> knot;
+	//! 轨迹特征向量: 直线方向向量 / 圆弧旋转矢量
+	Eigen::Matrix<T, 3, 1> dir;
+
+public:
+	//! 轨迹速度
+	T speed = 10;
+	//! 轨迹平滑度
+	T smooth = 0;
+	//! 自定义的序列化数据
+	std::vector<T> appendix;
+
+	friend class DiscreteTrajectory<T>;
+
+public:
+	TrajectoryConfig() {}
+	~TrajectoryConfig() {}
+
+	/**
+	* @brief  附加数据处理
+	* @param  data    新的附加数据
+	*/
+	uint8_t set_appendix(const std::vector<T> data) {
+		appendix = data;
+		return 0;
+	}
+	uint8_t add_appendix(const std::vector<T> data) {
+		appendix.insert(appendix.end(), data.begin(), data.end());
+		return 0;
+	}
+	uint8_t reset_appendix() {
+		appendix.clear();
+		return 0;
+	}
+
+
+	bool isArc() {
+		return (dist > 0);
+	}
+	bool isLine() {
+		return (dist < 0);
+	}
+};
+
+
+/**
+* @brief  空间轨迹的几何参数
+*/
 template <typename T = float>
 class DiscreteTrajectory {
 public:
@@ -147,9 +204,14 @@ public:
 	std::list<std::vector<T>> nodePoint;
 	//! 轨迹中间点 <位置, Rzyx(deg), 附加轴>
 	std::list<std::vector<T>> midPoint;
-	//! 轨迹信息    直线    方向(0:2),    -直线长度(3), null(4:6),     速度(7)
-	//              圆弧    圆心坐标(0:2),+圆弧长度(3), 旋转矢量(4:6), 速度(7)
+	//! 轨迹信息    直线    方向(0:2),    -直线长度(3), null(4:6),     速度(7), 平滑度(8)
+	//              圆弧    圆心坐标(0:2),+圆弧长度(3), 旋转矢量(4:6), 速度(7), 平滑度(8)
 	std::list<std::vector<T>> trajInfo;
+
+	//! 运动参数
+	//std::list<TrajectoryConfig<T>> trajInfo;
+
+	//! 当前轨迹的指针
 
 	//! 摆焊参数
 	std::list<Weave> waveInfo;
@@ -157,6 +219,11 @@ public:
 	std::list<Track> trackInfo;
 	//! 焊接参数
 	std::list<Arc_WeldingParaItem> weldInfo;
+
+private:
+	// 坐标轴单位向向量
+	static const Eigen::Matrix<T, 3, 1> unitX, unitY, unitZ;
+	static const T DT_PI;
 
 public:
 	DiscreteTrajectory() {};
@@ -171,6 +238,10 @@ public:
 		nodePoint.clear();
 		midPoint.clear();
 		trajInfo.clear();
+
+		waveInfo.clear();
+		trackInfo.clear();
+		weldInfo.clear();
 
 		nodePoint.push_back(pnt);
 
@@ -225,12 +296,14 @@ public:
 		
 		return 0;
 	}
-	uint8_t add_line(const std::vector<T>& pnt, const Weave& waveCfg, const Track& trackCfg, const Arc_WeldingParaItem& weldCfg) {
-		add_line(pnt);
+	uint8_t add_line(const std::vector<T>& pnt, const Weave& waveCfg, const Track& trackCfg, const Arc_WeldingParaItem& weldCfg, T smooth = -1) {
+		add_line(pnt, weldCfg.WeldingSpeed, smooth);
 
 		waveInfo.push_back(waveCfg);
 		trackInfo.push_back(trackCfg);
 		weldInfo.push_back(weldCfg);
+
+		return 0;
 	}
 
 	/**
@@ -274,13 +347,16 @@ public:
 
 		return 0;
 	}
-	uint8_t add_arc(const std::vector<T>& end, const std::vector<T>& mid, const Weave& waveCfg, const Track& trackCfg, const Arc_WeldingParaItem& weldCfg) {
-		add_arc(end, mid);
+	uint8_t add_arc(const std::vector<T>& end, const std::vector<T>& mid, const Weave& waveCfg, const Track& trackCfg, const Arc_WeldingParaItem& weldCfg, T smooth = -1) {
+		add_arc(end, mid, weldCfg.WeldingSpeed, smooth);
 
 		waveInfo.push_back(waveCfg);
 		trackInfo.push_back(trackCfg);
 		weldInfo.push_back(weldCfg);
+
+		return 0;
 	}
+
 	/**
 	* @brief  拐角过渡
 	* @param  end    圆弧终点
@@ -636,9 +712,6 @@ public:
 	}
 
 private:
-	// 坐标轴单位向向量
-	static const Eigen::Matrix<T, 3, 1> unitX, unitY, unitZ;
-	static const T DT_PI;
 
 	/**
 	* @brief  空间三点构建圆弧轨迹
@@ -714,6 +787,7 @@ private:
 		return (Eigen::AngleAxis<T>(qx * DT_PI / 180, unitX) * Eigen::AngleAxis<T>(qy * DT_PI / 180, unitY) * Eigen::AngleAxis<T>(qz * DT_PI / 180, unitZ)).matrix();
 	}
 };
+
 
 template <typename T>
 const T DiscreteTrajectory<T>::DT_PI = 3.14159265358979323846;

@@ -106,23 +106,6 @@ int32 ZauxRobot::connect(std::string addr) {
 	return 0;
 }
 
-int32 ZauxRobot::load_basic_pragma(const char *basPath, uint32_t mode) {
-	// 加载 bas 程序
-	if (ZAux_BasDown(handle_, basPath, mode) != 0) {
-		printf("Error: # ZauxRobot::load_basic_pragma() check basPath.\n");
-		return 1;
-	}
-	// 等待 bas 程序下载
-	std::this_thread::sleep_for(std::chrono::milliseconds(500));
-	return 0;
-}
-
-
-//uint8_t ZauxRobot::load_basic_project(const char *basPath, uint32_t mode) {
-//	return 1;
-//}
-
-
 int32 ZauxRobot::disconnect() {
 	//关闭连接 
 	if (ZAux_Close(handle_) > 0) {
@@ -136,21 +119,42 @@ int32 ZauxRobot::disconnect() {
 }
 
 
+/* ******************************** 上位机软件交互 ********************************* */
+int32 ZauxRobot::load_basic_pragma(const char *basPath, uint32_t mode) {
+	// 加载 bas 程序
+	if (ZAux_BasDown(handle_, basPath, mode) != 0) {
+		printf("Error: # ZauxRobot::load_basic_pragma() check basPath.\n");
+		return 1;
+	}
+	// 等待 bas 程序下载
+	std::this_thread::sleep_for(std::chrono::milliseconds(500));
+	return 0;
+}
+
+
+int32 ZauxRobot::load_basic_project(const char *basPath, uint32_t mode) {
+	return 1;
+}
+
+
 int32 ZauxRobot::forward_kinematics(int delay) {
 	float flag = 1.0, readVal;
 	int ret = 0;
 
-	ret = ZAux_Direct_SetTable(handle_, 1006, 1, &flag);
-
-	// 等待正逆解切换完成
 	for (size_t i = 0; i < delay; ++i) {
-		std::this_thread::sleep_for(std::chrono::milliseconds(100));
 		ret = ZAux_Direct_GetTable(handle_, 1003, 1, &readVal);
 
-		// 切换完成
-		if (std::fabs(readVal - flag) < 1e-2) {
+		// 判断是否切换完成
+		if (readVal > 0) {
 			return ret;
 		}
+		// 切换一次正解
+		else if (i == 0) {
+			ret = ZAux_Direct_SetTable(handle_, 1006, 1, &flag);
+		}
+
+		// 等待正逆解切换完成
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
 	}
 
 	return -1;
@@ -161,17 +165,21 @@ int32 ZauxRobot::inverse_kinematics(int delay) {
 	float flag = -1.0, readVal;
 	int ret = 0;
 
-	ret = ZAux_Direct_SetTable(handle_, 1006, 1, &flag);
-
-	// 等待正逆解切换完成
 	for (size_t i = 0; i < delay; ++i) {
-		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+		// 判断是否在正解模式
 		ret = ZAux_Direct_GetTable(handle_, 1003, 1, &readVal);
 
-		// 切换完成
-		if (std::fabs(readVal - flag) < 1e-2) {
+		// 判断是否切换完成
+		if (readVal < 0) {
 			return ret;
 		}
+		// 切换一次逆解
+		else if (i == 0) {
+			ret = ZAux_Direct_SetTable(handle_, 1006, 1, &flag);
+		}
+
+		// 等待正逆解切换完成
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
 	}
 
 	return -1;
@@ -189,6 +197,263 @@ int32 ZauxRobot::wait_idle(int axisIdx) {
 }
 
 
+int32 ZauxRobot::switch_automation(bool setAuto) {
+	// 切换到自动模式
+	if (setAuto) {
+
+	}
+	// 切换到手动模式
+	else {
+		
+	}
+	return 0;
+}
+
+
+int32 ZauxRobot::jog_moving(int idx, int type, int dir) {
+	std::vector<std::vector<int>> axisIdx;
+	// 关节轴
+	std::vector<int> tmpAxis = jointAxisIdx_;
+	tmpAxis.insert(tmpAxis.end(), appAxisIdx_.begin(), appAxisIdx_.end());
+	axisIdx.push_back(tmpAxis);
+	// 世界坐标轴
+	tmpAxis = tcpPosAxisIdx_;
+	tmpAxis.insert(tmpAxis.end(), tcpAngleAxisIdx_.begin(), tcpAngleAxisIdx_.end());
+	tmpAxis.insert(tmpAxis.end(), appAxisIdx_.begin(), appAxisIdx_.end());
+	axisIdx.push_back(tmpAxis);
+	// 工具坐标轴
+	axisIdx.push_back(tmpAxis);
+
+	int ret = 0;
+	if (type < 0|| type >= axisIdx.size() || idx < 0 || idx >= axisIdx[type].size()) {
+		return -1;
+	}
+
+	// 运动类型与轴号不匹配
+	float kinematics = 0.0;
+	ZAux_Direct_GetTable(handle_, 1003, 1, &kinematics);
+	// 空间运动(1) + 正解模式(1)
+	if (type > 0 && std::fabs(kinematics - 1) < 1e-3) {
+		return -2;
+	}
+	// 关节运动(0) + 逆解模式(-1)
+	else if (type == 0 && kinematics < 0) {
+		return -2;
+	}
+
+	// VMOVE 点动
+	if (type < 2) {
+		// 运动结束
+		if (dir == 0) {
+			ret = ZAux_Direct_Single_Cancel(handle_, axisIdx[type][idx], 4);
+		}
+		// 正向运动
+		else if (dir > 0) {
+			ret = ZAux_Direct_Single_Vmove(handle_, axisIdx[type][idx], 1);
+		}
+		// 负向运动
+		else {
+			ret = ZAux_Direct_Single_Vmove(handle_, axisIdx[type][idx], -1);
+		}
+	}
+	// MOVE 点动
+	else {
+		// 当前姿态欧拉角
+		std::vector<float> euler;
+		ret = get_axis_param(tcpAngleAxisIdx_, "DPOS", euler);
+
+		// 计算当前方向
+		//Eigen::Matrix3f trans = DiscreteTrajectory<float>::RzyxToRotMat(euler[5], euler[4], euler[3])
+	}
+
+	return ret;
+}
+
+
+int32 ZauxRobot::set_manual_SpeedRatio(float speedRatio) {
+	float readVal;
+	int ret = 0;
+
+	ret = ZAux_Direct_GetTable(handle_, 1003, 1, &readVal);
+	if (ret != 0)
+		return handle_zaux_error(ret);
+
+	// 逆解
+	if (std::fabs(readVal + 1) < 1e-2) {
+		// 速度: 关节 + 附加轴 + 位置 + 姿态
+		std::vector<float> curSpeed(appAxisIdx_.size() + tcpPosAxisIdx_.size() + tcpAngleAxisIdx_.size(), 0);
+		// 关节速度寄存器
+		std::vector<int> jointSpeedVR = { 83,84,85, 1077,1078,1079,1080,1081,1082 };
+
+		ret = get_axis_param(jointSpeedVR, "VR", curSpeed);
+		if (ret != 0)
+			return handle_zaux_error(ret);
+
+		for (size_t i = 0; i < curSpeed.size(); ++i) {
+			curSpeed[i] *= speedRatio;
+		}
+
+		// 关节+附加轴轴号
+		std::vector<int> axisIdx = appAxisIdx_;
+		axisIdx.insert(axisIdx.end(), tcpPosAxisIdx_.begin(), tcpPosAxisIdx_.end());
+		axisIdx.insert(axisIdx.end(), tcpAngleAxisIdx_.begin(), tcpAngleAxisIdx_.end());
+		// 修改关节速度
+		ret = set_axis_param(axisIdx, "SPEED", curSpeed);
+		if (ret != 0)
+			return handle_zaux_error(ret);
+
+		// 修改正解
+		speedRatio = 1.0;
+	}
+
+	// 正解
+	// 速度: 关节 + 附加轴
+	std::vector<float> curSpeed(jointAxisIdx_.size() + appAxisIdx_.size(), 0);
+	// 关节速度寄存器
+	std::vector<int> jointSpeedVR = { 77,78,79,80,81,82,83,84,85 };
+
+	ret = get_axis_param(jointSpeedVR, "VR", curSpeed);
+	if (ret != 0)
+		return handle_zaux_error(ret);
+
+	for (size_t i = 0; i < curSpeed.size(); ++i) {
+		curSpeed[i] *= speedRatio;
+	}
+
+	// 关节+附加轴轴号
+	std::vector<int> axisIdx = jointAxisIdx_;
+	axisIdx.insert(axisIdx.end(), appAxisIdx_.begin(), appAxisIdx_.end());
+	// 修改关节速度
+	ret = set_axis_param(axisIdx, "SPEED", curSpeed);
+
+	return 0;
+}
+
+int32 ZauxRobot::set_auto_SpeedRatio(float speedRatio) {
+	int ret = 0;
+
+	ret = set_axis_param({ jointAxisIdx_[0], tcpPosAxisIdx_[0], swingAxisIdx_[0] }, "SPEED_RATIO", { speedRatio, speedRatio, speedRatio });
+
+	return handle_zaux_error(ret);
+}
+
+int32 ZauxRobot::set_acceleration_time(float time) {
+	int ret = 0;
+
+	// 速度: 关节 + 附加轴 + 位置 + 姿态
+	std::vector<float> curSpeed(jointAxisIdx_.size() + appAxisIdx_.size() + tcpPosAxisIdx_.size() + tcpAngleAxisIdx_.size(), 0);
+	// 关节速度寄存器
+	std::vector<int> jointSpeedVR = { 77,78,79,80,81,82,83,84,85, 1077,1078,1079,1080,1081,1082 };
+
+	ret = get_axis_param(jointSpeedVR, "VR", curSpeed);
+	if (ret != 0)
+		return handle_zaux_error(ret);
+
+	// 速度 / 加速时间 = 加速度
+	for (size_t i = 0; i < curSpeed.size(); ++i) {
+		curSpeed[i] /= time;
+	}
+
+	// 关节+附加轴轴号
+	std::vector<int> axisIdx = jointAxisIdx_;
+	axisIdx.insert(axisIdx.end(), appAxisIdx_.begin(), appAxisIdx_.end());
+	axisIdx.insert(axisIdx.end(), tcpPosAxisIdx_.begin(), tcpPosAxisIdx_.end());
+	axisIdx.insert(axisIdx.end(), tcpAngleAxisIdx_.begin(), tcpAngleAxisIdx_.end());
+
+	// 修改关节加减速度
+	ret = set_axis_param(axisIdx, "ACCEL", curSpeed);
+	if (ret != 0)
+		return handle_zaux_error(ret);
+	ret = set_axis_param(axisIdx, "DECEL", curSpeed);
+	if (ret != 0)
+		return handle_zaux_error(ret);
+	
+	return 0;
+}
+
+
+/* ******************************** 基础运动指令封装 *********************************
+* @brief 正运动接口封装。Zmotion -> ZauxRobot
+*/
+
+// 基础运动指令封装：move
+int32 ZauxRobot::move(const std::vector<int>& axis, const std::vector<float>& relMove, float speed) {
+	// 轨迹点维度与驱动轴维度的较小值
+	size_t num = std::min(relMove.size(), axis.size());
+	if (num < 1)
+		return 1;
+
+	int ret = 0;
+	// 生成命令
+	char cmdbuff[2048], tempbuff[2048], cmdbuffAck[2048];
+
+	strcpy(cmdbuff, "BASE(");
+	for (size_t i = 0; i < num - 1; i++) {
+		sprintf(tempbuff, "%d,", axis[i]);
+		strcat(cmdbuff, tempbuff);
+	}
+	sprintf(tempbuff, "%d)", axis[num - 1]);
+	strcat(cmdbuff, tempbuff);
+	strcat(cmdbuff, "\n");
+
+	// 单独设置速度
+	if (speed > 0) {
+		sprintf(tempbuff, "FORCE_SPEED(%d) = %f", axis[0], speed);
+		strcat(cmdbuff, tempbuff);
+	}
+
+	strcat(cmdbuff, "MOVESP(");
+	for (size_t i = 0; i < num - 1; i++) {
+		sprintf(tempbuff, "%f,", relMove[i]);
+		strcat(cmdbuff, tempbuff);
+	}
+	sprintf(tempbuff, "%f)", relMove[num - 1]);
+	strcat(cmdbuff, tempbuff);
+
+	//调用命令执行函数
+	ret = ZAux_DirectCommand(handle_, cmdbuff, cmdbuffAck, 2048);
+	return handle_zaux_error(ret);
+}
+// moveABS
+int32 ZauxRobot::moveABS(const std::vector<int>& axis, const std::vector<float>& endMove, float speed) {
+	// 轨迹点维度与驱动轴维度的较小值
+	size_t num = std::min(endMove.size(), axis.size());
+	if (num < 1)
+		return 1;
+
+	int ret = 0;
+	// 生成命令
+	char cmdbuff[2048], tempbuff[2048], cmdbuffAck[2048];
+
+	strcpy(cmdbuff, "BASE(");
+	for (size_t i = 0; i < num - 1; i++) {
+		sprintf(tempbuff, "%d,", axis[i]);
+		strcat(cmdbuff, tempbuff);
+	}
+	sprintf(tempbuff, "%d)", axis[num - 1]);
+	strcat(cmdbuff, tempbuff);
+	strcat(cmdbuff, "\n");
+
+	// 单独设置速度
+	if (speed > 0) {
+		sprintf(tempbuff, "FORCE_SPEED(%d) = %f", axis[0], speed);
+		strcat(cmdbuff, tempbuff);
+	}
+
+	strcat(cmdbuff, "MOVEABSSP(");
+	for (size_t i = 0; i < num - 1; i++) {
+		sprintf(tempbuff, "%f,", endMove[i]);
+		strcat(cmdbuff, tempbuff);
+	}
+	sprintf(tempbuff, "%f)", endMove[num - 1]);
+	strcat(cmdbuff, tempbuff);
+
+	//调用命令执行函数
+	ret = ZAux_DirectCommand(handle_, cmdbuff, cmdbuffAck, 2048);
+	return handle_zaux_error(ret);
+}
+
+// 获取轴号信息
 int32 ZauxRobot::get_axis_param(const std::vector<int>& axisList, char* paramName, std::vector<float>& paramList) {
 	char  cmdbuff[2048], tempbuff[2048], cmdbuffAck[2048];
 	int ret = 0;
@@ -230,7 +495,7 @@ int32 ZauxRobot::get_axis_param(const std::vector<int>& axisList, char* paramNam
 	return handle_zaux_error(ret);
 }
 
-
+// 设置轴号信息
 int32 ZauxRobot::set_axis_param(const std::vector<int>& axisList, char* paramName, const std::vector<float>& paramList, int principal) {
 	char  cmdbuff[2048], tempbuff[2048], cmdbuffAck[2048];
 	int ret = 0;
@@ -256,59 +521,16 @@ int32 ZauxRobot::set_axis_param(const std::vector<int>& axisList, char* paramNam
 		}
 	}
 	//std::cout << cmdbuff << std::endl;
-	ret =  ZAux_DirectCommand(handle_, cmdbuff, cmdbuffAck, 2048);
+	ret = ZAux_DirectCommand(handle_, cmdbuff, cmdbuffAck, 2048);
 	return handle_zaux_error(ret);
 }
 
 
-int32 ZauxRobot::jog_moving(int idx, int type, int dir) {
-	std::vector<std::vector<int>> axisIdx;
-	// 关节轴
-	std::vector<int> tmpAxis = jointAxisIdx_;
-	tmpAxis.insert(tmpAxis.end(), appAxisIdx_.begin(), appAxisIdx_.end());
-	axisIdx.push_back(tmpAxis);
-	// 世界坐标轴
-	tmpAxis = tcpPosAxisIdx_;
-	tmpAxis.insert(tmpAxis.end(), tcpAngleAxisIdx_.begin(), tcpAngleAxisIdx_.end());
-	tmpAxis.insert(tmpAxis.end(), appAxisIdx_.begin(), appAxisIdx_.end());
-	axisIdx.push_back(tmpAxis);
-	// 工具坐标轴
-	axisIdx.push_back({});
+/* ******************************** 工业机械臂常用指令封装 *********************************
+* @brief 常用指令接口的实现。ZauxRobot -> 工业机械臂常用指令
+*/
 
-	int ret = 0;
-	if (type < 0|| type >= axisIdx.size() || idx < 0 || idx >= axisIdx[type].size()) {
-		return -1;
-	}
-
-	// 运动类型与轴号不匹配
-	float kinematics = 0.0;
-	ZAux_Direct_GetTable(handle_, 1003, 1, &kinematics);
-	std::cout << type << ": " << kinematics << std::endl;
-	// 空间运动 + 正解模式
-	if (type > 0 && std::fabs(kinematics - 1) < 1e-3) {
-		return -2;
-	}
-	// 关节运动 + 逆解模式
-	else if (type == 0 && kinematics < 0) {
-		return -2;
-	}
-
-	// 运动结束
-	if (dir == 0) {
-		ret = ZAux_Direct_Single_Cancel(handle_, axisIdx[type][idx], 4);
-	}
-	// 正向运动
-	else if (dir > 0) {
-		ret = ZAux_Direct_Single_Vmove(handle_, axisIdx[type][idx], 1);
-	}
-	// 负向运动
-	else {
-		ret = ZAux_Direct_Single_Vmove(handle_, axisIdx[type][idx], -1);
-	}
-	return ret;
-}
-
-
+// 点到点同步运动：move_ptp
 int32 ZauxRobot::move_ptp(const std::vector<float>& relEndMove, float speedRatio) {
 	std::vector<int> axisIdx = { 0,1,2,3,4,5,6,7,8 };
 
@@ -323,6 +545,12 @@ int32 ZauxRobot::move_ptp(const std::vector<float>& relEndMove, float speedRatio
 	sprintf(tempbuff, "%d)", axisIdx[num - 1]);
 	strcat(cmdbuff, tempbuff);
 	strcat(cmdbuff, "\n");
+	
+	// 设置速度
+	if (speedRatio > 0) {
+		sprintf(tempbuff, "SPEED_RATIO = %f\n", speedRatio);
+		strcat(cmdbuff, tempbuff);
+	}
 
 	strcat(cmdbuff, "MOVE_PTP(1,");
 	for (size_t i = 0; i < num - 1; i++) {
@@ -352,6 +580,12 @@ int32 ZauxRobot::move_ptp_abs(const std::vector<float>& endMove, float speedRati
 	sprintf(tempbuff, "%d)", axisIdx[num - 1]);
 	strcat(cmdbuff, tempbuff);
 	strcat(cmdbuff, "\n");
+
+	// 设置速度
+	if (speedRatio > 0) {
+		sprintf(tempbuff, "SPEED_RATIO = %f\n", speedRatio);
+		strcat(cmdbuff, tempbuff);
+	}
 
 	strcat(cmdbuff, "MOVE_PTPABS(1,");
 	for (size_t i = 0; i < num - 1; i++) {
@@ -926,9 +1160,8 @@ int32 ZauxRobot::execute_discrete_trajectory_abs(DiscreteTrajectory<float>& disc
 	return handle_zaux_error(ret);
 }
 
-
 int32 ZauxRobot::execute_discrete_trajectory(DiscreteTrajectory<float>& discreteTrajectory) {
-	return 1;
+	return 0;
 }
 
 int32 ZauxRobot::swing_tri(DiscreteTrajectory<float>& discreteTrajectory, const Weave& waveCfg) {
@@ -1137,9 +1370,6 @@ int32 ZauxRobot::swing_sin(DiscreteTrajectory<float>& discreteTrajectory, const 
 	int ret = 0;
 
 	// 只计算TCP位置速度
-	//for (size_t i = 0; i < axis.size(); ++i) {
-	//	ZAux_Direct_MovePara(handle_, axis[0], (char*)"INTERP_FACTOR", axis[i], i < 3);
-	//}
 	std::vector<float> interpVec(axis.size(), 0);
 	for (size_t i = 0; i < 3; ++i) {
 		interpVec[i] = 1;
@@ -1425,7 +1655,338 @@ int32 ZauxRobot::swing_trajectory(DiscreteTrajectory<float>& discreteTrajectory,
 }
 
 
-int32 ZauxRobot::arc_tracking_config(const Track& trackCfg) {
+int32 ZauxRobot::swing_trajectory(DiscreteTrajectory<float>& discreteTrajectory) {
+	std::vector<int> axis = swingAxisIdx_;
+	axis.insert(axis.end(), tcpAngleAxisIdx_.begin(), tcpAngleAxisIdx_.end());
+	axis.insert(axis.end(), appAxisIdx_.begin(), appAxisIdx_.end());
+
+	// 轨迹点维度与驱动轴维度的较小值
+	size_t num = (std::min)(discreteTrajectory.nodePoint.begin()->size(), axis.size());
+	int ret = 0;
+
+	// 只计算TCP位置速度
+	std::vector<float> interpVec(axis.size(), 0);
+	for (size_t i = 0; i < 3; ++i) {
+		interpVec[i] = 1;
+	}
+	ret = set_axis_param(axis, (char*)"INTERP_FACTOR", interpVec);
+	if (ret != 0)
+		return handle_zaux_error(ret);
+	// 凸轮轴清零
+	for (size_t i = 0; i < camAxisIdx_.size(); ++i) {
+		ret = ZAux_Direct_MovePara(handle_, axis[0], (char*)"DPOS", camAxisIdx_[i], 0);
+		if (ret != 0)
+			return handle_zaux_error(ret);
+	}
+	// 摆动开始
+	ret = ZAux_Direct_MoveTable(handle_, axis[0], 1000, 1);
+	if (ret != 0)
+		return handle_zaux_error(ret);
+
+	// 遍历轨迹
+	auto nodePointIte = discreteTrajectory.nodePoint.begin();
+	auto midPointIte = discreteTrajectory.midPoint.begin();
+	auto infoIte = discreteTrajectory.trajInfo.begin();
+	// 工艺参数
+	auto waveCfg = discreteTrajectory.waveInfo.begin();
+	auto trackCfg = discreteTrajectory.trackInfo.begin();
+	auto weldCfg = discreteTrajectory.weldInfo.begin();
+
+	float trajIdx = -1;
+	ret = ZAux_Direct_MoveTable(handle_, axis[0], 1001, trajIdx++);
+	if (ret != 0)
+		return handle_zaux_error(ret);
+	Eigen::Vector3f begEuler((*nodePointIte)[3], (*nodePointIte)[4], (*nodePointIte)[5]), endEuler = begEuler;
+	while (infoIte != discreteTrajectory.trajInfo.end()) {
+		auto curPoint = *nodePointIte++;
+
+		// 构建当前轨迹信息
+		DiscreteTrajectory<float> curTraj;
+		curTraj.set_starting_point(curPoint);
+		// 圆弧轨迹
+		if ((*infoIte)[3] > 0) {
+			curTraj.add_arc(*nodePointIte, *midPointIte, weldCfg->WeldingSpeed);
+		}
+		else {
+			curTraj.add_line(*nodePointIte, weldCfg->WeldingSpeed);
+		}
+
+		// 轨迹速度
+		float vel = (*infoIte)[7];
+		if (ret != 0)
+			return handle_zaux_error(ret);
+		// 修改焊接参数
+		//update_welder_config(*weldCfg);
+		// 修改跟踪参数
+		//update_track_config(*trackCfg);
+
+		// 设置摆动参数
+		ret = update_swing_table(*waveCfg);
+		if (ret != 0)
+			return handle_zaux_error(ret);
+		int numPeriod = std::round(std::fabs((*infoIte)[3]) / (vel / waveCfg->Freq));
+		// 小于1个周期则不摆动
+		if (numPeriod > 0) {
+			// 计算摆焊方向
+			std::vector<float> zDir(3), zEuler = { static_cast<float>(curPoint[3] * M_PI / 180),
+				static_cast<float>(curPoint[4] * M_PI / 180),
+				static_cast<float>(curPoint[5] * M_PI / 180) };
+
+			zDir[0] = sin(zEuler[2]) * sin(zEuler[0]) + cos(zEuler[2]) * cos(zEuler[0]) * sin(zEuler[1]);
+			zDir[1] = cos(zEuler[0]) * sin(zEuler[2]) * sin(zEuler[1]) - cos(zEuler[2]) * sin(zEuler[0]);
+			zDir[2] = cos(zEuler[0]) * cos(zEuler[1]);
+
+			ret = swing_on(vel, *waveCfg, zDir);
+			if (ret != 0)
+				return handle_zaux_error(ret);
+
+			// 计算轴运动距离
+			ret = swing_off(std::fabs((*infoIte)[3]));
+			if (ret != 0)
+				return handle_zaux_error(ret);
+		}
+
+		// 设置平滑度
+		if ((*infoIte)[8] >= 0) {
+			ret = ZAux_Direct_SetZsmooth(handle_, axis[0], (*infoIte)[8]);
+			if (ret != 0)
+				return handle_zaux_error(ret);
+		}
+		// 设置速度
+		ret = ZAux_Direct_SetForceSpeed(handle_, axis[0], vel);
+
+		// 开始摆焊
+		if (waveCfg->Shape == 0) {
+			swing_single_sin(curTraj, *waveCfg);
+		}
+		else if (waveCfg->Shape == 3) {
+			swing_single_tri(curTraj, *waveCfg);
+		}
+		else {
+
+		}
+		// 轨迹计数+1
+		ret = ZAux_Direct_MoveTable(handle_, axis[0], 1001, trajIdx++);
+
+		midPointIte++;
+		infoIte++;
+		// 
+		waveCfg++;
+		trackCfg++;
+		weldCfg++;
+	}
+
+	// 摆动停止
+	ret = ZAux_Direct_MoveTable(handle_, axis[0], 1000, -1);
+	if (ret != 0)
+		return handle_zaux_error(ret);
+
+	return handle_zaux_error(ret);
+}
+
+int32 ZauxRobot::swing_single_sin(DiscreteTrajectory<float>& discreteTrajectory, const Weave& waveCfg) {
+	std::vector<int> axis = swingAxisIdx_;
+	axis.insert(axis.end(), tcpAngleAxisIdx_.begin(), tcpAngleAxisIdx_.end());
+	axis.insert(axis.end(), appAxisIdx_.begin(), appAxisIdx_.end());
+
+	// 轨迹点维度与驱动轴维度的较小值
+	size_t num = (std::min)(discreteTrajectory.nodePoint.begin()->size(), axis.size());
+	int ret = 0;
+
+	// 遍历轨迹
+	auto nodePointIte = discreteTrajectory.nodePoint.begin();
+	auto midPointIte = discreteTrajectory.midPoint.begin();
+	auto infoIte = discreteTrajectory.trajInfo.begin();
+
+	Eigen::Vector3f begEuler((*nodePointIte)[3], (*nodePointIte)[4], (*nodePointIte)[5]), endEuler = begEuler;
+	while (infoIte != discreteTrajectory.trajInfo.end()) {
+		std::vector<float> endBuffer = *(nodePointIte++);
+
+		std::vector<float> relEndMove(axis.size(), 0);
+		// 终点到起点的相对运动
+		for (size_t i = 0; i < num; ++i) {
+			relEndMove[i] = (*nodePointIte)[i] - endBuffer[i];
+		}
+
+		// 欧拉角转换到相对运动: beg -> mid -> end
+		Eigen::Vector3f begEuler = Eigen::Vector3f(endBuffer[3], endBuffer[4], endBuffer[5]);
+		Eigen::Vector3f endEuler = Eigen::Vector3f((*midPointIte)[3], (*midPointIte)[4], (*midPointIte)[5]);
+		Eigen::Vector3f relEuler = get_zyx_euler_distance(begEuler, endEuler);
+		begEuler = endEuler;
+		endEuler = Eigen::Vector3f((*nodePointIte)[3], (*nodePointIte)[4], (*nodePointIte)[5]);
+		relEuler += get_zyx_euler_distance(begEuler, endEuler);
+		for (size_t i = 0; i < 3; ++i) {
+			// 欧拉角相对值
+			relEndMove[3 + i] = relEuler[i];
+			// 终点欧拉角转换到与起点同侧
+			(*nodePointIte)[3 + i] = endEuler[i];
+		}
+		begEuler = endEuler;
+
+		// 轨迹速度
+		float vel = (*infoIte)[7];
+
+		// 设置摆动参数
+		int numPeriod = std::round(std::fabs((*infoIte)[3]) / (vel / waveCfg.Freq));
+
+		// 圆弧运动
+		if ((*infoIte)[3] > 0) {
+			// 机器人停止
+			if (waveCfg.Dwell_type > 0 && (waveCfg.Dwell_left + waveCfg.Dwell_right) > 0 && numPeriod > 0) {
+				// 计算点位置
+				Eigen::Vector3f tempPos, rotNorm((*infoIte)[4], (*infoIte)[5], (*infoIte)[6]);
+				Eigen::Vector3f radiusDir(0, 0, 0), centerPos((*infoIte)[0], (*infoIte)[1], (*infoIte)[2]);
+
+				std::vector<float> tempBegPoint = endBuffer, tempEndPoint(endBuffer.size(), 0), tempCenPoint(endBuffer.size(), 0);
+
+				for (size_t i = 0; i < 3; ++i) {
+					tempCenPoint[i] = centerPos[i];
+					radiusDir[i] = endBuffer[i] - centerPos[i];
+				}
+				float partial = 0, theta = rotNorm.norm();
+				rotNorm.normalize();
+
+				// 1/4 周期
+				partial += 1.0 / (4 * numPeriod);
+				tempPos = Eigen::AngleAxisf(partial * theta, rotNorm) * radiusDir + centerPos;
+				for (size_t i = 0; i < num; ++i) {
+					tempEndPoint[i] = i < 3 ? tempPos[i] : (endBuffer[i] + relEndMove[i] * partial);
+				}
+				ret = this->moveC(axis, tempBegPoint, tempCenPoint, tempEndPoint, 1);
+				if (ret != 0)
+					return handle_zaux_error(ret);
+				tempBegPoint = tempEndPoint;
+				if (waveCfg.Dwell_right > 0) {
+					ret = ZAux_Direct_MoveDelay(handle_, axis[0], waveCfg.Dwell_right);
+					if (ret != 0)
+						return handle_zaux_error(ret);
+				}
+
+				// 1/2 * 2周期
+				for (size_t i = 0; i < numPeriod; ++i) {
+					partial += 1.0 / (2 * numPeriod);
+					tempPos = Eigen::AngleAxisf(partial * theta, rotNorm) * radiusDir + centerPos;
+					for (size_t i = 0; i < num; ++i) {
+						tempEndPoint[i] = i < 3 ? tempPos[i] : (endBuffer[i] + relEndMove[i] * partial);
+					}
+					ret = this->moveC(axis, tempBegPoint, tempCenPoint, tempEndPoint, 1);
+					if (ret != 0)
+						return handle_zaux_error(ret);
+					tempBegPoint = tempEndPoint;
+					if (waveCfg.Dwell_left > 0) {
+						ret = ZAux_Direct_MoveDelay(handle_, axis[0], waveCfg.Dwell_left);
+						if (ret != 0)
+							return handle_zaux_error(ret);
+
+					}
+					// 最后一个周期退出
+					if (i + 1 == numPeriod) break;
+
+					partial += 1.0 / (2 * numPeriod);
+					tempPos = Eigen::AngleAxisf(partial * theta, rotNorm) * radiusDir + centerPos;
+					for (size_t i = 0; i < num; ++i) {
+						tempEndPoint[i] = i < 3 ? tempPos[i] : (endBuffer[i] + relEndMove[i] * partial);
+					}
+					ret = this->moveC(axis, tempBegPoint, tempCenPoint, tempEndPoint, 1);
+					if (ret != 0)
+						return handle_zaux_error(ret);
+					tempBegPoint = tempEndPoint;
+					if (waveCfg.Dwell_right > 0) {
+						ret = ZAux_Direct_MoveDelay(handle_, axis[0], waveCfg.Dwell_right);
+						if (ret != 0)
+							return handle_zaux_error(ret);
+
+					}
+				}
+
+				// 1/4 周期
+				partial += 1.0 / (4 * numPeriod);
+				tempPos = Eigen::AngleAxisf(partial * theta, rotNorm) * radiusDir + centerPos;
+				for (size_t i = 0; i < num; ++i) {
+					tempEndPoint[i] = i < 3 ? tempPos[i] : (endBuffer[i] + relEndMove[i] * partial);
+				}
+				ret = this->moveC(axis, tempBegPoint, tempCenPoint, tempEndPoint, 1);
+				if (ret != 0)
+					return handle_zaux_error(ret);
+				tempBegPoint = tempEndPoint;
+			}
+			// 摆动停止
+			else {
+				ret = this->moveC(axis, endBuffer, *midPointIte, *nodePointIte);
+				if (ret != 0)
+					return handle_zaux_error(ret);
+			}
+		}
+		// 直线运动
+		else {
+			// 机器人停止
+			if (waveCfg.Dwell_type > 0 && (waveCfg.Dwell_left + waveCfg.Dwell_right) > 0 && numPeriod > 0) {
+				std::vector<float> detRelEndMove(relEndMove.size(), 0);
+
+				// 1/4 周期运动量
+				for (size_t j = 0; j < relEndMove.size(); ++j)
+					detRelEndMove[j] = relEndMove[j] / (numPeriod * 4);
+				ret = this->moveL(axis, detRelEndMove);
+				if (ret != 0)
+					return handle_zaux_error(ret);
+				if (waveCfg.Dwell_right > 0) {
+					ret = ZAux_Direct_MoveDelay(handle_, axis[0], waveCfg.Dwell_right);
+					if (ret != 0)
+						return handle_zaux_error(ret);
+				}
+
+				// 1/2 周期运动量
+				for (size_t j = 0; j < relEndMove.size(); ++j)
+					detRelEndMove[j] *= 2;
+				for (int i = 0; i < numPeriod; ++i) {
+					ret = this->moveL(axis, detRelEndMove);
+					if (ret != 0)
+						return handle_zaux_error(ret);
+					if (waveCfg.Dwell_left > 0) {
+						ret = ZAux_Direct_MoveDelay(handle_, axis[0], waveCfg.Dwell_left);
+						if (ret != 0)
+							return handle_zaux_error(ret);
+					}
+					// 最后一个周期退出
+					if (i + 1 == numPeriod) break;
+
+					ret = this->moveL(axis, detRelEndMove);
+					if (ret != 0)
+						return handle_zaux_error(ret);
+					if (waveCfg.Dwell_right > 0) {
+						ret = ZAux_Direct_MoveDelay(handle_, axis[0], waveCfg.Dwell_right);
+						if (ret != 0)
+							return handle_zaux_error(ret);
+					}
+				}
+				// 1/4 周期运动量
+				for (size_t j = 0; j < relEndMove.size(); ++j)
+					detRelEndMove[j] /= 2;
+				ret = this->moveL(axis, detRelEndMove);
+				if (ret != 0)
+					return handle_zaux_error(ret);
+			}
+			// 摆动停止
+			else {
+				// 相对运动
+				ret = this->moveL(axis, relEndMove);
+				if (ret != 0)
+					return handle_zaux_error(ret);
+			}
+		}
+
+		midPointIte++;
+		infoIte++;
+	}
+
+	return handle_zaux_error(ret);
+}
+
+int32 ZauxRobot::swing_single_tri(DiscreteTrajectory<float>& discreteTrajectory, const Weave& waveCfg) {
+	return 0;
+}
+
+int32 ZauxRobot::update_track_config(const Track& trackCfg) {
 	std::vector<float> config(20, 0);
 	size_t configTableStart = 1010;
 	int ret = 0;
@@ -1456,13 +2017,38 @@ int32 ZauxRobot::arc_tracking_config(const Track& trackCfg) {
 	config[18] = trackCfg.SegCorrectCycles;
 	config[19] = trackCfg.Ud_refSampleCount;
 
-	ret = ZAux_Direct_SetTable(handle_, configTableStart, config.size(), config.data());
+	//ret = ZAux_Direct_SetTable(handle_, configTableStart, config.size(), config.data());
+	//if (ret != 0)
+	//	return handle_zaux_error(ret);
+	for (size_t i = 0; i < config.size(); ++i) {
+		ret = ZAux_Direct_MoveTable(handle_, swingAxisIdx_[0], 1010+i, config[i]);
+		if (ret != 0)
+			return handle_zaux_error(ret);
+	}
+
+	return handle_zaux_error(ret);
+}
+
+int32 ZauxRobot::update_welder_config(const Arc_WeldingParaItem& weldCfg) {
+	//std::vector<float> config(20, 0);
+	size_t configTableStart = 1030;
+	int ret = 0;
+
+	// 电流
+	ret = ZAux_Direct_MoveTable(handle_, swingAxisIdx_[0], 1035, weldCfg.WeldingCrt_Spd);
+	if (ret != 0)
+		return handle_zaux_error(ret);
+	// 电压
+	ret = ZAux_Direct_MoveTable(handle_, swingAxisIdx_[0], 1036, weldCfg.WeldingVtg_Strth);
+	if (ret != 0)
+		return handle_zaux_error(ret);
+	// 执行修改
+	ret = ZAux_Direct_MoveTable(handle_, swingAxisIdx_[0], 1030, 1);
 	if (ret != 0)
 		return handle_zaux_error(ret);
 
 	return handle_zaux_error(ret);
 }
-
 
 int32 ZauxRobot::handle_zaux_error(int32 errCode) {
 	if (errCode != 0) {

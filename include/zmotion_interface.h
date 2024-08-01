@@ -50,8 +50,10 @@ public:
 	// 逆解位置轴
 	std::vector<int> ikPosAxisIdx_ = { 9,10,11 };
 	// TCP 姿态轴
-	std::vector<int> tcpAngleAxisIdx_ = { 12,13,14 };
+	//std::vector<int> tcpAngleAxisIdx_ = { 12,13,14 };
+	std::vector<int> tcpAngleAxisIdx_ = { 21,22,23 };
 	// TCP 位置轴
+	//std::vector<int> tcpPosAxisIdx_ = { 9, 10, 11 };
 	std::vector<int> tcpPosAxisIdx_ = { 18, 19, 20 };
 	// 附加轴
 	std::vector<int> appAxisIdx_ = { 6,7,8 };
@@ -93,7 +95,7 @@ public:
 			 1          烧录到 ROM
 	*/
 	int32 load_basic_pragma(const char *basPath, uint32_t mode = 0);
-	//uint8_t load_basic_project(const char *basPath, uint32_t mode = 0);
+	int32 load_basic_project(const char *basPath, uint32_t mode = 0);
 
 	//uint8_t enable_zaux_log(int logMode);
 
@@ -160,6 +162,12 @@ public:
 	int32 swing_on(float vel, const Weave& waveCfg, const std::vector<float>& toolDir = std::vector<float>());
 	int32 swing_off(float displacement = 0.0);
 
+
+	/**
+	* @brief switch_automation：切换自动/手动模式
+	*/
+	int32 switch_automation(bool setAuto);
+
 	/**
 	* @brief 轴点动
 	* @param       idx     运动轴号
@@ -173,13 +181,36 @@ public:
 	int32 jog_moving(int idx, int type, int dir);
 
 	/**
+	* @brief set_auto_SpeedRatio
+	* @param       speedRatio    速度比率
+	*/
+	int32 set_manual_SpeedRatio(float speedRatio);
+	int32 set_auto_SpeedRatio(float speedRatio);
+
+	/**
+	* @brief set_acceleration_time
+	* @param       time    加减速时间
+	*/
+	int32 set_acceleration_time(float time);
+
+	/**
+	* @brief move(abs) 基础运动指令封装，仅下发运动指令
+	* @param       axis       运动轴号
+	* @param       relMove    相对运动距离
+	* @param       endMove    目标运动位置
+	* @param       speed      主轴速度
+	*/
+	int32 move(const std::vector<int>& axis, const std::vector<float>& relMove, float speed = -1.0);
+	int32 moveABS(const std::vector<int>& axis, const std::vector<float>& endMove, float speed = -1.0);
+
+	/**
 	* @brief movePtp
 	* @param       axis          关节运动轴号
 	* @param       relEndMove    相对运动距离
 	* @param       speedRatio    速度比率
 	*/
-	int32 move_ptp(const std::vector<float>& relEndMove, float speedRatio = 1.0);
-	int32 move_ptp_abs(const std::vector<float>& endMove, float speedRatio = 1.0);
+	int32 move_ptp(const std::vector<float>& relEndMove, float speedRatio = -1.0);
+	int32 move_ptp_abs(const std::vector<float>& endMove, float speedRatio = -1.0);
 
 	/**
 	* @brief moveJ
@@ -215,9 +246,16 @@ public:
 	int32 swing_sin(DiscreteTrajectory<float>& discreteTrajectory, const Weave& waveCfg);
 	int32 swing_tri();
 
-	int32 arc_tracking_config(const Track& trackCfg);
+	int32 swing_trajectory(DiscreteTrajectory<float>& discreteTrajectory);
+	int32 swing_single_tri(DiscreteTrajectory<float>& discreteTrajectory, const Weave& waveCfg);
+	int32 swing_single_sin(DiscreteTrajectory<float>& discreteTrajectory, const Weave& waveCfg);
+
+	int32 update_track_config(const Track& trackCfg);
+
+	int32 update_welder_config(const Arc_WeldingParaItem& weldCfg);
 
 	int32 handle_zaux_error(int32 errCode);
+
 	/**
 	* @brief 上位机紧急停止
 	*/

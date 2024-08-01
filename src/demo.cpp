@@ -13,9 +13,11 @@ namespace shawn_test {
 	// 轨迹处理
 	DiscreteTrajectory<float> discreteTrajectory;
 	// 摆焊参数
-	Weave waveCfg;
+	Weave waveCfg, waveCfg2;
 	// 电弧跟踪参数
-	Track trackCfg;
+	Track trackCfg, trackCfg2;
+	// 焊接参数
+	Arc_WeldingParaItem weldCfg, weldCfg2;
 
 	void dec_to_hex();
 	void hex_to_dec(uint16_t high, uint16_t low);
@@ -63,26 +65,41 @@ void shawn_test::zswing() {
 	waveCfg.RightWidth = 3.2;
 	waveCfg.Dwell_left = 100;
 	waveCfg.Dwell_right = 100;
-	waveCfg.Dwell_type = 0;
+	waveCfg.Dwell_type = 1;
 	waveCfg.Angle_Ltype_top = 0;
 	waveCfg.Angle_Ltype_btm = 0;
+
+	waveCfg2.Shape = 0;
+	waveCfg2.Freq = 2.0;
+	waveCfg2.LeftWidth = 2;
+	waveCfg2.RightWidth = 2;
+	waveCfg2.Dwell_left = 200;
+	waveCfg2.Dwell_right = 200;
+	waveCfg2.Dwell_type = 0;
 
 	// 电弧跟踪参数
 	trackCfg.Lr_enable = 0;
 	trackCfg.Ud_enable = 0;
-	robot.arc_tracking_config(trackCfg);
+	//robot.update_track_config(trackCfg);
+
+	// 焊接参数
+	weldCfg.WeldingSpeed = 20;
+	weldCfg2.WeldingSpeed = 30;
+
 
 	/* ****  **** */
 	// base(0,1,2,3,4,5) moveabs(-10.9961, -11.7299, 34.4224, 0, 67.3076, -55.9961)
-	//discreteTrajectory.set_starting_point({ 1000, -200, 200, 179.9990, -28.8890, -135, 0 });
-	//discreteTrajectory.add_line({ 1000, 200, 200, 179.9990, -28.8890, 135, 0.0 }, 20);
-	//discreteTrajectory.add_line({ 1400, 200, 200, 179.9990, -28.8900, 45, 0.0 });
-	//discreteTrajectory.add_arc({ 900, -200, 200, 179.9990, -28.8890, -135, 0 }, { 950, -150, 200, 179.9990, -28.8890, 135, 0.0 });
+	discreteTrajectory.set_starting_point({ 5.281000,303.548004,-428.114014,193.382797,-54.630501,-181.863007, 0 });
+	discreteTrajectory.add_line({ 5.539900,297.584015,-427.559998,-164.951385,-54.984009,173.656601, 0.0 });
+	discreteTrajectory.add_line({ 1.017500,149.130005,-423.072998,16.049631,-124.323891,6.034603, 0.0 });
+	discreteTrajectory.add_line({ 8.252900,-163.563995,-424.289001,-0.800630,-124.622124,21.578623, 0.0 });
+	discreteTrajectory.add_line({ 16.843000,-320.963989,-425.096008,2.802146,-119.946411,42.512638, 0.0 });
 	//discreteTrajectory.equally_divide({ 200, 100 });
 
-	discreteTrajectory.set_starting_point({ 1000, -200, 200, 179.9990, -28.8890, 135, 0 });
-	discreteTrajectory.add_line({ 1000, 0, 200, 179.9990, -28.8890, 135, 0.0 }, 10);
-	//discreteTrajectory.add_line({ 1000, 200, 200, 179.9990, -28.8890, 135, 0.0 }, 20);
+	//18,19,20,21,22,23,24,25,26
+	//discreteTrajectory.set_starting_point({ 1000, -200, 200, 179.9990, -28.8890, 135, 0 });
+	//discreteTrajectory.add_line({ 1000, 0, 200, 179.9990, -28.8890, 135, 0.0 }, waveCfg, trackCfg, weldCfg);
+	//discreteTrajectory.add_line({ 1000, 200, 200, 179.9990, -28.8890, 135, 0.0 }, waveCfg2, trackCfg2, weldCfg2);
 	//discreteTrajectory.add_line({ 1200, 0, 200, 179.9990, -28.8900, 45, 0.0 }, 50);
 
 	//discreteTrajectory.set_starting_point({ -22.873100,-1467.822754,-17.759701,178.017395,-43.356602,-46.023201,-85.892502, 0 });
@@ -96,9 +113,10 @@ void shawn_test::zswing() {
 	/* ****  **** */
 	//discreteTrajectory.corner_transition();
 	//discreteTrajectory.corner_slowdown(10);
-	//robot.execute_discrete_trajectory_abs(discreteTrajectory);
+	robot.execute_discrete_trajectory_abs(discreteTrajectory);
 	//robot.swing_trajectory(discreteTrajectory, waveCfg);
-	robot.move_ptp_abs({ 100,120,80,50,80,30 }, 0.5);
+	//robot.move_ptp_abs({ 100,120,80,50,80,30 }, 0.5);
+	//robot.swing_trajectory(discreteTrajectory);
 }
 
 
