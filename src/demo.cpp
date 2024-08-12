@@ -24,7 +24,7 @@ namespace shawn_test {
 	void format_float(std::string ifname, std::string ofname);
 	void zswing();
 	// 读取并保存电流值
-	void save_current();
+	void save_current(const std::string& fold = "arc_tracking/");
 }
 //using namespace shawn_test;
 
@@ -43,10 +43,10 @@ int main() {
 	//robotB.set_axis({ 0,1,2,3,4,5 }, { 7,8,9 }, { 10,11,12 }, { 7,8,9 }, {  }, { 36,37,38 }, { 40,41,42 }, { 39 });
 
 	shawn_test::zswing();
-	//shawn_test::save_current();
+	//shawn_test::save_current("./");
 
 	printf("Press <Enter> to exit.\n");
-	getchar();
+	//getchar();
 
 	//// 断开连接
 	//robot.disconnect();
@@ -65,7 +65,7 @@ void shawn_test::zswing() {
 	waveCfg.RightWidth = 3.2;
 	waveCfg.Dwell_left = 100;
 	waveCfg.Dwell_right = 100;
-	waveCfg.Dwell_type = 1;
+	waveCfg.Dwell_type = 0;
 	waveCfg.Angle_Ltype_top = 0;
 	waveCfg.Angle_Ltype_btm = 0;
 
@@ -89,11 +89,10 @@ void shawn_test::zswing() {
 
 	/* ****  **** */
 	// base(0,1,2,3,4,5) moveabs(-10.9961, -11.7299, 34.4224, 0, 67.3076, -55.9961)
-	discreteTrajectory.set_starting_point({ 5.281000,303.548004,-428.114014,193.382797,-54.630501,-181.863007, 0 });
-	discreteTrajectory.add_line({ 5.539900,297.584015,-427.559998,-164.951385,-54.984009,173.656601, 0.0 });
-	discreteTrajectory.add_line({ 1.017500,149.130005,-423.072998,16.049631,-124.323891,6.034603, 0.0 });
-	discreteTrajectory.add_line({ 8.252900,-163.563995,-424.289001,-0.800630,-124.622124,21.578623, 0.0 });
-	discreteTrajectory.add_line({ 16.843000,-320.963989,-425.096008,2.802146,-119.946411,42.512638, 0.0 });
+	discreteTrajectory.set_starting_point({ 132.561005,3.092700,-420.473999,-191.216995,-55.311699,-102.778000, 0 });
+	discreteTrajectory.add_line({ 124.508003,4.327800,-410.992004,-8.733237,-111.726524,65.269234, 0.0 }, waveCfg, trackCfg, weldCfg);
+	discreteTrajectory.add_line({ 120.498001,1.379500,-352.433014,-7.894470,-104.864510,65.795158, 0.0 }, waveCfg, trackCfg, weldCfg);
+	discreteTrajectory.add_line({ 121.116997,0.437300,-344.458008,-7.285388,-104.983093,64.644684, 0.0 }, waveCfg, trackCfg, weldCfg);
 	//discreteTrajectory.equally_divide({ 200, 100 });
 
 	//18,19,20,21,22,23,24,25,26
@@ -113,10 +112,10 @@ void shawn_test::zswing() {
 	/* ****  **** */
 	//discreteTrajectory.corner_transition();
 	//discreteTrajectory.corner_slowdown(10);
-	robot.execute_discrete_trajectory_abs(discreteTrajectory);
+	//robot.execute_discrete_trajectory_abs(discreteTrajectory);
 	//robot.swing_trajectory(discreteTrajectory, waveCfg);
 	//robot.move_ptp_abs({ 100,120,80,50,80,30 }, 0.5);
-	//robot.swing_trajectory(discreteTrajectory);
+	robot.swing_trajectory(discreteTrajectory);
 }
 
 
@@ -170,7 +169,7 @@ void shawn_test::hex_to_dec(uint16_t high, uint16_t low) {
 }
 
 
-void shawn_test::save_current() {
+void shawn_test::save_current(const std::string& fold) {
 	// 读取点数
 	float tmpTable = 0.0;
 	int numPoint = 0;
@@ -183,7 +182,7 @@ void shawn_test::save_current() {
 	numPoint = std::floor(tmpTable);
 	numPoint = numPoint < 0 ? 0 : numPoint % 5000;
 	printf("num of sin period: %d\n", numPoint);
-	robot.save_table(saverIdx+1, numPoint, "./arc_tracking/SD0_idx.txt");
+	robot.save_table(saverIdx+1, numPoint, fold + "SD0_idx.txt");
 
 	// 原始电流值
 	saverIdx = 105000;
@@ -191,7 +190,7 @@ void shawn_test::save_current() {
 	numPoint = std::floor(tmpTable);
 	numPoint = numPoint < 0 ? 0 : numPoint % 5000;
 	printf("num of raw current: %d\n", numPoint);
-	robot.save_table(saverIdx + 1, numPoint, "./arc_tracking/SD0.txt");
+	robot.save_table(saverIdx + 1, numPoint, fold + "SD0.txt");
 
 	// 滤波后的电流值
 	saverIdx = 110000;
@@ -199,7 +198,7 @@ void shawn_test::save_current() {
 	numPoint = std::floor(tmpTable);
 	numPoint = numPoint < 0 ? 0 : numPoint % 5000;
 	printf("num of fined current: %d\n", numPoint);
-	robot.save_table(saverIdx + 1, numPoint, "./arc_tracking/SD0_f.txt");
+	robot.save_table(saverIdx + 1, numPoint, fold + "SD0_f.txt");
 
 	// 滤波后的电压值
 	saverIdx = 115000;
@@ -207,7 +206,7 @@ void shawn_test::save_current() {
 	numPoint = std::floor(tmpTable);
 	numPoint = numPoint < 0 ? 0 : numPoint % 5000;
 	printf("num of voltage: %d\n", numPoint);
-	robot.save_table(saverIdx + 1, numPoint, "./arc_tracking/SD0_v.txt");
+	robot.save_table(saverIdx + 1, numPoint, fold + "SD0_v.txt");
 
 	return;
 }

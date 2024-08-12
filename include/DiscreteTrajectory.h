@@ -161,7 +161,7 @@ public:
 	//! 自定义的序列化数据
 	std::vector<T> appendix;
 
-	friend class DiscreteTrajectory<T>;
+	//friend class DiscreteTrajectory<T>;
 
 public:
 	TrajectoryConfig() {}

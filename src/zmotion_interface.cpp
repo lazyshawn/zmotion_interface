@@ -1768,6 +1768,11 @@ int32 ZauxRobot::swing_trajectory(DiscreteTrajectory<float>& discreteTrajectory)
 		// 轨迹计数+1
 		ret = ZAux_Direct_MoveTable(handle_, axis[0], 1001, trajIdx++);
 
+		// 修改欧拉角
+		for (size_t i = 3; i < 6; ++i) {
+			(*nodePointIte)[i] = curTraj.nodePoint.back()[i];
+		}
+
 		midPointIte++;
 		infoIte++;
 		// 
