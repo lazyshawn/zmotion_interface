@@ -886,7 +886,24 @@ int32 ZauxRobot::update_swing_table(const Weave& waveCfg) {
 
 	// 机器人停止
 	if (holdType > 0) {
-		robotHoldTime = (waveCfg.Dwell_left + waveCfg.Dwell_right) / 2;
+		// 左右摆幅不同
+		if (std::fabs(waveCfg.LeftWidth - waveCfg.RightWidth) > 1e-1) {
+			for (size_t i = 0; i < numInterp; ++i) {
+				waveGenerator[i] = std::sin(2 * M_PI * i / (numInterp - 1));
+				// 左摆动
+				waveGenerator[i] *= i > numInterp / 2 ? waveCfg.LeftWidth / waveCfg.RightWidth : 1;
+			}
+			sinTableBeg = 2100;
+			for (size_t i = 0; i < numInterp; ++i) {
+				ret = ZAux_Direct_MoveTable(handle_, swingAxisIdx_[0], sinTableBeg + i, waveGenerator[i]);
+				// 判断返回状态
+				if (ret != 0)
+					return handle_zaux_error(ret);
+			}
+		}
+		else {
+			robotHoldTime = (waveCfg.Dwell_left + waveCfg.Dwell_right) / 2;
+		}
 	}
 	// 摆动停留时间
 	else if (holdType == 0 && waveCfg.Dwell_left + waveCfg.Dwell_right > 0) {
@@ -948,7 +965,8 @@ int32 ZauxRobot::swing_on(float vel, const Weave& waveCfg, const std::vector<flo
 	// 摆动频率
 	float freq = waveCfg.Freq;
 	// 摆动振幅
-	float ampl = (waveCfg.LeftWidth + waveCfg.RightWidth) / 2;
+	//float ampl = (waveCfg.LeftWidth + waveCfg.RightWidth) / 2;
+	float ampl = waveCfg.RightWidth;
 	// 停止模式
 	int holdType = waveCfg.Dwell_type;
 	// 机器人停留时间, 摆动停留时间 (仅一个生效)
@@ -957,8 +975,8 @@ int32 ZauxRobot::swing_on(float vel, const Weave& waveCfg, const std::vector<flo
 		swingHoldTime = waveCfg.Dwell_left + waveCfg.Dwell_right;
 	}
 
-	//sinTableBeg = holdType > 0 ? 2000 : 2100;
-	sinTableBeg = (holdType == 0 && waveCfg.Dwell_left + waveCfg.Dwell_right > 0) ? 2100 : 2000;
+	sinTableBeg = ((holdType == 0 && waveCfg.Dwell_left + waveCfg.Dwell_right > 0) || (std::fabs(waveCfg.LeftWidth - waveCfg.RightWidth) > 1e-1)) ? 2100 : 2000;
+	//sinTableBeg = (holdType == 0 && waveCfg.Dwell_left + waveCfg.Dwell_right > 0) ? 2100 : 2000;
 
 	// 周期长度
 	float dist = vel * (1/freq + swingHoldTime/1000);

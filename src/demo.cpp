@@ -61,11 +61,11 @@ void shawn_test::zswing() {
 	waveCfg.Length = 3;
 	waveCfg.Bias = 2;
 	waveCfg.Freq = 1.0;
-	waveCfg.LeftWidth = 3.2;
-	waveCfg.RightWidth = 3.2;
+	waveCfg.LeftWidth = 4;
+	waveCfg.RightWidth = 2;
 	waveCfg.Dwell_left = 100;
 	waveCfg.Dwell_right = 100;
-	waveCfg.Dwell_type = 0;
+	waveCfg.Dwell_type = 1;
 	waveCfg.Angle_Ltype_top = 0;
 	waveCfg.Angle_Ltype_btm = 0;
 
@@ -90,8 +90,8 @@ void shawn_test::zswing() {
 	/* ****  **** */
 	// base(0,1,2,3,4,5) moveabs(-10.9961, -11.7299, 34.4224, 0, 67.3076, -55.9961)
 	discreteTrajectory.set_starting_point({ 132.561005,3.092700,-420.473999,-191.216995,-55.311699,-102.778000, 0 });
-	discreteTrajectory.add_line({ 124.508003,4.327800,-410.992004,-8.733237,-111.726524,65.269234, 0.0 }, waveCfg, trackCfg, weldCfg);
-	discreteTrajectory.add_line({ 120.498001,1.379500,-352.433014,-7.894470,-104.864510,65.795158, 0.0 }, waveCfg, trackCfg, weldCfg);
+	//discreteTrajectory.add_line({ 124.508003,4.327800,-410.992004,-8.733237,-111.726524,65.269234, 0.0 }, waveCfg, trackCfg, weldCfg);
+	//discreteTrajectory.add_line({ 120.498001,1.379500,-352.433014,-7.894470,-104.864510,65.795158, 0.0 }, waveCfg, trackCfg, weldCfg);
 	discreteTrajectory.add_line({ 121.116997,0.437300,-344.458008,-7.285388,-104.983093,64.644684, 0.0 }, waveCfg, trackCfg, weldCfg);
 	//discreteTrajectory.equally_divide({ 200, 100 });
 
