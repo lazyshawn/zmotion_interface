@@ -470,8 +470,6 @@ int32 ZauxRobot::set_acceleration_time(float time) {
 
 	// 速度: 关节 + 附加轴 + 位置 + 姿态
 	std::vector<float> curSpeed(jointAxisIdx.size() + appAxisIdx.size() + tcpPosAxisIdx.size() + tcpAngleAxisIdx.size(), 0);
-	// 关节速度寄存器
-	std::vector<int> jointSpeedVR = { 77,78,79,80,81,82,83,84,85, 1077,1078,1079,1080,1081,1082 };
 
 	ret = get_axis_param(jointSpeedVR, "VR", curSpeed);
 	if (ret != 0)
@@ -498,6 +496,18 @@ int32 ZauxRobot::set_acceleration_time(float time) {
 	return 0;
 }
 
+int32 ZauxRobot::set_axis_speed(const std::vector<float>& speedList) {
+	int ret = set_axis_param(jointSpeedVR, "VR", speedList);
+	return ret;
+}
+
+std::vector<float> ZauxRobot::get_axis_speed() {
+	std::vector<float> curSpeed;
+
+	int ret = get_axis_param(jointSpeedVR, "VR", curSpeed);
+
+	return curSpeed;
+}
 
 /* ******************************** 基础运动指令封装 *********************************
 * @brief 正运动接口封装。Zmotion -> ZauxRobot
@@ -986,7 +996,24 @@ int32 ZauxRobot::update_swing_table(const Weave& waveCfg) {
 
 	// 机器人停止
 	if (holdType > 0) {
-		robotHoldTime = (waveCfg.Dwell_left + waveCfg.Dwell_right) / 2;
+		// 左右摆幅不同
+		if (std::fabs(waveCfg.LeftWidth - waveCfg.RightWidth) > 1e-1) {
+			for (size_t i = 0; i < numInterp; ++i) {
+				waveGenerator[i] = std::sin(2 * M_PI * i / (numInterp - 1));
+				// 左摆动
+				waveGenerator[i] *= i > numInterp / 2 ? waveCfg.LeftWidth / waveCfg.RightWidth : 1;
+			}
+			sinTableBeg = 2100;
+			for (size_t i = 0; i < numInterp; ++i) {
+				ret = ZAux_Direct_MoveTable(handle_, swingAxisIdx[0], sinTableBeg + i, waveGenerator[i]);
+				// 判断返回状态
+				if (ret != 0)
+					return handle_zaux_error(ret);
+			}
+		}
+		else {
+			robotHoldTime = (waveCfg.Dwell_left + waveCfg.Dwell_right) / 2;
+		}
 	}
 	// 摆动停留时间
 	else if (holdType == 0 && waveCfg.Dwell_left + waveCfg.Dwell_right > 0) {
@@ -1058,7 +1085,7 @@ int32 ZauxRobot::swing_on(float vel, const Weave& waveCfg, const std::vector<flo
 	}
 
 	//sinTableBeg = holdType > 0 ? 2000 : 2100;
-	sinTableBeg = (holdType == 0 && waveCfg.Dwell_left + waveCfg.Dwell_right > 0) ? 2100 : 2000;
+	sinTableBeg = ((holdType == 0 && waveCfg.Dwell_left + waveCfg.Dwell_right > 0) || (std::fabs(waveCfg.LeftWidth - waveCfg.RightWidth) > 1e-1)) ? 2100 : 2000;
 
 	// 周期长度
 	float dist = vel * (1/freq + swingHoldTime/1000);

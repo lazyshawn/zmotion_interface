@@ -73,6 +73,9 @@ public:
 	// 摆焊 = 摆焊轴 + TCP姿态 + 附加轴
 	std::vector<int> swingAxis;
 
+	// 关节速度寄存器
+	std::vector<int> jointSpeedVR = { 77,78,79,80,81,82,83,84,85, 1077,1077,1077,1078,1078,1078 };
+
 	// 摆动标志位索引
 	size_t swingFlagIdx = 1000;
 
@@ -203,6 +206,8 @@ public:
 	* @param       time    加减速时间
 	*/
 	int32 set_acceleration_time(float time);
+	int32 set_axis_speed(const std::vector<float>& speedList);
+	std::vector<float> get_axis_speed();
 
 	/**
 	* @brief move(abs) 基础运动指令封装，仅下发运动指令
