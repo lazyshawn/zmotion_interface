@@ -1,22 +1,116 @@
-
+ï»¿
 #include<chrono>
 #include<thread>
 #include<iostream>
 
 #include"zmotion_interface.h"
 
-// ÖáºÅÕ¼ÓÃÁĞ±í
+// è½´å·å ç”¨åˆ—è¡¨
 std::vector<int> ZauxAxis::AxisIdxList = std::vector<int>(100, 0);
 
 ZauxAxis::ZauxAxis() {
 }
 
 
-ZauxRobot::ZauxRobot(const std::vector<int>& jointAxisIdx, const std::vector<int>& ikPosAxisIdx, const std::vector<int>& tcpAngleAxisIdx,
-				     const std::vector<int>& tcpPosAxisIdx, const std::vector<int>& appAxisIdx, const std::vector<int>& camAxisIdx,
-					 const std::vector<int>& swingAxisIdx,const std::vector<int>& connpathAxisIdx) {
+std::vector<float> serialize_weld_param(const Weave& waveCfg, const Arc_WeldingParaItem& weldCfg, const Track& trackCfg) {
+	std::vector<float> param(40, 0);
 
-	set_axis(jointAxisIdx, ikPosAxisIdx, tcpAngleAxisIdx, tcpPosAxisIdx, appAxisIdx, camAxisIdx, connpathAxisIdx, swingAxisIdx);
+	// æ‘†ç„Šå‚æ•°
+	param[0] = waveCfg.Id;
+	param[1] = waveCfg.Shape;
+	param[2] = waveCfg.Freq;
+	param[3] = waveCfg.LeftWidth;
+	param[4] = waveCfg.RightWidth;
+	param[5] = waveCfg.Dwell_type;
+	param[6] = waveCfg.Dwell_left;
+	param[7] = waveCfg.Dwell_right;
+
+	// ç„Šæ¥å‚æ•°
+	param[10] = weldCfg.Id;
+	param[11] = weldCfg.WeldingCrt_Spd;
+	param[12] = weldCfg.WeldingVtg_Strth;
+
+	// è·Ÿè¸ªå‚æ•°
+	// å·¦å³è·Ÿè¸ªå‚æ•°
+	param[20] = trackCfg.Lr_enable;
+	param[21] = trackCfg.Lr_offset;
+	param[22] = trackCfg.Lr_gain;
+	// ç§¯åˆ†å¸¸æ•°
+	param[23] = trackCfg.Lr_maxSingleCompensation;
+	//config[4] = trackCfg.Lr_diffCoeff;
+	param[25] = trackCfg.Lr_minCompensation;
+	param[26] = trackCfg.Lr_maxCompensation;
+	param[27] = trackCfg.Lr_MaxCorrectAngle;
+	// ä¸Šä¸‹è·Ÿè¸ªå‚æ•°
+	param[30] = trackCfg.Ud_enable;
+	param[31] = trackCfg.Ud_offset;
+	param[32] = trackCfg.Ud_gain;
+	param[35] = trackCfg.Ud_minCompensation;
+	param[36] = trackCfg.Ud_maxCompensation;
+	param[37] = trackCfg.Ud_MaxCorrectAngle;
+	// å…¶ä»–å‚æ•°
+	param[38] = trackCfg.SegCorrectCycles;
+	param[39] = trackCfg.Ud_refSampleCount;
+
+	return param;
+}
+
+uint8_t read_weld_param(const std::vector<float>& param, Weave& waveCfg, Arc_WeldingParaItem& weldCfg, Track& trackCfg) {
+	if (param.size() < 40) {
+		waveCfg = Weave();
+		weldCfg = Arc_WeldingParaItem();
+		trackCfg = Track();
+		return 0;
+	}
+
+	// æ‘†ç„Šå‚æ•°
+	waveCfg.Id = param[0];
+	waveCfg.Shape = param[1];
+	waveCfg.Freq = param[2];
+	waveCfg.LeftWidth = param[3];
+	waveCfg.RightWidth = param[4];
+	waveCfg.Dwell_type = param[5];
+	waveCfg.Dwell_left = param[6];
+	waveCfg.Dwell_right = param[7];
+
+	// ç„Šæ¥å‚æ•°
+	weldCfg.Id = param[10];
+	weldCfg.WeldingCrt_Spd = param[11];
+	weldCfg.WeldingVtg_Strth = param[12];
+
+	// è·Ÿè¸ªå‚æ•°
+	// å·¦å³è·Ÿè¸ªå‚æ•°
+	trackCfg.Lr_enable = param[20];
+	trackCfg.Lr_offset = param[21];
+	trackCfg.Lr_gain = param[22];
+	// ç§¯åˆ†å¸¸æ•°
+	trackCfg.Lr_maxSingleCompensation = param[23];
+	trackCfg.Lr_minCompensation = param[25];
+	trackCfg.Lr_maxCompensation = param[26];
+	trackCfg.Lr_MaxCorrectAngle = param[27];
+	// ä¸Šä¸‹è·Ÿè¸ªå‚æ•°
+	trackCfg.Ud_enable = param[30];
+	trackCfg.Ud_offset = param[31];
+	trackCfg.Ud_gain = param[32];
+	trackCfg.Ud_minCompensation = param[35];
+	trackCfg.Ud_maxCompensation = param[36];
+	trackCfg.Ud_MaxCorrectAngle = param[37];
+	// å…¶ä»–å‚æ•°
+	trackCfg.SegCorrectCycles = param[38];
+	trackCfg.Ud_refSampleCount = param[39];
+	return 0;
+}
+
+
+ZauxRobot::ZauxRobot() {
+	derive_config();
+}
+
+ZauxRobot::ZauxRobot(const std::vector<int>& jointAxisIdx_, const std::vector<int>& appAxisIdx_,
+	const std::vector<int>& tcpPosAxisIdx_, const std::vector<int>& tcpAngleAxisIdx_,
+	const std::vector<int>& camAxisIdx_, const std::vector<int>& swingAxis_, const std::vector<int>& excuteAxis_) {
+
+	set_axis(jointAxisIdx_, appAxisIdx_, tcpPosAxisIdx_, tcpAngleAxisIdx_, camAxisIdx_, swingAxis_, excuteAxis_);
 }
 
 
@@ -27,22 +121,49 @@ int32 ZauxRobot::set_handle(ZMC_HANDLE handle) {
 }
 
 
-int32 ZauxRobot::set_axis(const std::vector<int>& jointAxisIdx, const std::vector<int>& ikPosAxisIdx, const std::vector<int>& tcpAngleAxisIdx,
-	                        const std::vector<int>& tcpPosAxisIdx, const std::vector<int>& appAxisIdx, const std::vector<int>& camAxisIdx,
-	                        const std::vector<int>& swingAxisIdx, const std::vector<int>& connpathAxisIdx) {
-	jointAxisIdx_ = jointAxisIdx;
-	ikPosAxisIdx_ = ikPosAxisIdx;
-	tcpAngleAxisIdx_ = tcpAngleAxisIdx;
-	tcpPosAxisIdx_ = tcpPosAxisIdx;
-	appAxisIdx_ = appAxisIdx;
-	camAxisIdx_ = camAxisIdx;
-	swingAxisIdx_ = swingAxisIdx;
-	connpathAxisIdx_ = connpathAxisIdx;
+int32 ZauxRobot::set_axis(const std::vector<int>& jointAxisIdx_, const std::vector<int>& appAxisIdx_,
+	const std::vector<int>& tcpPosAxisIdx_, const std::vector<int>& tcpAngleAxisIdx_,
+	const std::vector<int>& camAxisIdx_, const std::vector<int>& swingAxis_, const std::vector<int>& excuteAxis_) {
 
-	ZAux_Direct_GetUnits(handle_, tcpPosAxisIdx_[0], &axisUnits);
+	// å…³èŠ‚è½´
+	jointAxisIdx = jointAxisIdx_;
+	// TCP å§¿æ€è½´
+	tcpAngleAxisIdx = tcpAngleAxisIdx_;
+	// TCP ä½ç½®è½´
+	tcpPosAxisIdx = tcpPosAxisIdx_;
+	// é™„åŠ è½´
+	appAxisIdx = appAxisIdx_;
+	// å‡¸è½®è½´
+	camAxisIdx = camAxisIdx_;
+	// æ‘†ç„Šè½´
+	swingAxis = swingAxis_;
+	// æ‰§è¡Œè½´
+	excuteAxis = excuteAxis_;
+
+	derive_config();
+
 	return 0;
 }
 
+int32 ZauxRobot::derive_config() {
+	// æ­£è§£è½´
+	fkAxis = jointAxisIdx;
+	fkAxis.insert(fkAxis.end(), appAxisIdx.begin(), appAxisIdx.end());
+
+	// é€†è§£è½´
+	ikAxis = tcpPosAxisIdx;
+	ikAxis.insert(ikAxis.end(), tcpAngleAxisIdx.begin(), tcpAngleAxisIdx.end());
+	ikAxis.insert(ikAxis.end(), appAxisIdx.begin(), appAxisIdx.end());
+
+	// æ‘†ç„Šè½´
+	swingAxis = swingAxisIdx;
+	swingAxis.insert(swingAxis.end(), tcpAngleAxisIdx.begin(), tcpAngleAxisIdx.end());
+	swingAxis.insert(swingAxis.end(), appAxisIdx.begin(), appAxisIdx.end());
+
+	// è„‰å†²å½“é‡
+	ZAux_Direct_GetUnits(handle_, tcpPosAxisIdx[0], &axisUnits);
+	return 0;
+}
 
 int32 ZauxRobot::connect_eth(char *ip_addr) {
 	printf("Connecting to: %s... ", ip_addr);
@@ -56,7 +177,7 @@ int32 ZauxRobot::connect_eth(char *ip_addr) {
 	printf("Succeed\n"); 
 
 	ZAux_SetTraceFile(4, "sdf");
-	ZAux_Direct_GetUnits(handle_, tcpPosAxisIdx_[0], &axisUnits);
+	ZAux_Direct_GetUnits(handle_, tcpPosAxisIdx[0], &axisUnits);
 	return 0;
 }
 
@@ -74,7 +195,7 @@ int32 ZauxRobot::connect_pci(uint32 cardNum) {
 
 	printf("Succeed\n");
 	ZAux_SetTraceFile(4, "sdf");
-	ZAux_Direct_GetUnits(handle_, tcpPosAxisIdx_[0], &axisUnits);
+	ZAux_Direct_GetUnits(handle_, tcpPosAxisIdx[0], &axisUnits);
 
 	return 0;
 }
@@ -90,7 +211,7 @@ int32 ZauxRobot::lazy_connect() {
 	else if (this->connect_pci(0) == 0) {
 		return 0;
 	}
-	// Á¬½ÓÊ§°Ü
+	// è¿æ¥å¤±è´¥
 	return 1;
 }
 
@@ -99,7 +220,7 @@ int32 ZauxRobot::connect(std::string addr) {
 		return connect_eth(const_cast<char *>(addr.c_str()));
 	}
 	else {
-		// ×ª»»³Éuint32
+		// è½¬æ¢æˆuint32
 		uint32 cardNum = static_cast<uint32>(std::atoi(addr.c_str()));
 		return connect_pci(cardNum);
 	}
@@ -107,7 +228,7 @@ int32 ZauxRobot::connect(std::string addr) {
 }
 
 int32 ZauxRobot::disconnect() {
-	//¹Ø±ÕÁ¬½Ó 
+	//å…³é—­è¿æ¥ 
 	if (ZAux_Close(handle_) > 0) {
 		printf("Error: # ZauxRobot::disconnect()!\n");
 		return 1;
@@ -119,14 +240,14 @@ int32 ZauxRobot::disconnect() {
 }
 
 
-/* ******************************** ÉÏÎ»»úÈí¼ş½»»¥ ********************************* */
+/* ******************************** ä¸Šä½æœºè½¯ä»¶äº¤äº’ ********************************* */
 int32 ZauxRobot::load_basic_pragma(const char *basPath, uint32_t mode) {
-	// ¼ÓÔØ bas ³ÌĞò
+	// åŠ è½½ bas ç¨‹åº
 	if (ZAux_BasDown(handle_, basPath, mode) != 0) {
 		printf("Error: # ZauxRobot::load_basic_pragma() check basPath.\n");
 		return 1;
 	}
-	// µÈ´ı bas ³ÌĞòÏÂÔØ
+	// ç­‰å¾… bas ç¨‹åºä¸‹è½½
 	std::this_thread::sleep_for(std::chrono::milliseconds(500));
 	return 0;
 }
@@ -144,16 +265,16 @@ int32 ZauxRobot::forward_kinematics(int delay) {
 	for (size_t i = 0; i < delay; ++i) {
 		ret = ZAux_Direct_GetTable(handle_, 1003, 1, &readVal);
 
-		// ÅĞ¶ÏÊÇ·ñÇĞ»»Íê³É
+		// åˆ¤æ–­æ˜¯å¦åˆ‡æ¢å®Œæˆ
 		if (readVal > 0) {
 			return ret;
 		}
-		// ÇĞ»»Ò»´ÎÕı½â
+		// åˆ‡æ¢ä¸€æ¬¡æ­£è§£
 		else if (i == 0) {
 			ret = ZAux_Direct_SetTable(handle_, 1006, 1, &flag);
 		}
 
-		// µÈ´ıÕıÄæ½âÇĞ»»Íê³É
+		// ç­‰å¾…æ­£é€†è§£åˆ‡æ¢å®Œæˆ
 		std::this_thread::sleep_for(std::chrono::milliseconds(100));
 	}
 
@@ -166,19 +287,19 @@ int32 ZauxRobot::inverse_kinematics(int delay) {
 	int ret = 0;
 
 	for (size_t i = 0; i < delay; ++i) {
-		// ÅĞ¶ÏÊÇ·ñÔÚÕı½âÄ£Ê½
+		// åˆ¤æ–­æ˜¯å¦åœ¨æ­£è§£æ¨¡å¼
 		ret = ZAux_Direct_GetTable(handle_, 1003, 1, &readVal);
 
-		// ÅĞ¶ÏÊÇ·ñÇĞ»»Íê³É
+		// åˆ¤æ–­æ˜¯å¦åˆ‡æ¢å®Œæˆ
 		if (readVal < 0) {
 			return ret;
 		}
-		// ÇĞ»»Ò»´ÎÄæ½â
+		// åˆ‡æ¢ä¸€æ¬¡é€†è§£
 		else if (i == 0) {
 			ret = ZAux_Direct_SetTable(handle_, 1006, 1, &flag);
 		}
 
-		// µÈ´ıÕıÄæ½âÇĞ»»Íê³É
+		// ç­‰å¾…æ­£é€†è§£åˆ‡æ¢å®Œæˆ
 		std::this_thread::sleep_for(std::chrono::milliseconds(100));
 	}
 
@@ -196,13 +317,32 @@ int32 ZauxRobot::wait_idle(int axisIdx) {
 	return 0;
 }
 
+int32 ZauxRobot::get_kinematic_mode() {
+	int ret = 0;
+	float readVal;
+
+	ret = ZAux_Direct_GetTable(handle_, 1003, 1, &readVal);
+	// æ­£è§£
+	if (std::fabs(readVal - 1) < 1e-3) {
+		return 1;
+	}
+	// é€†è§£
+	else if (std::fabs(readVal + 1) < 1e-3) {
+		return -1;
+	}
+	// æ‘†ç„Š
+	else if (std::fabs(readVal + 2) < 1e-3) {
+		return -2;
+	}
+}
+
 
 int32 ZauxRobot::switch_automation(bool setAuto) {
-	// ÇĞ»»µ½×Ô¶¯Ä£Ê½
+	// åˆ‡æ¢åˆ°è‡ªåŠ¨æ¨¡å¼
 	if (setAuto) {
 
 	}
-	// ÇĞ»»µ½ÊÖ¶¯Ä£Ê½
+	// åˆ‡æ¢åˆ°æ‰‹åŠ¨æ¨¡å¼
 	else {
 		
 	}
@@ -212,63 +352,57 @@ int32 ZauxRobot::switch_automation(bool setAuto) {
 
 int32 ZauxRobot::jog_moving(int idx, int type, int dir) {
 	std::vector<std::vector<int>> axisIdx;
-	// ¹Ø½ÚÖá
-	std::vector<int> tmpAxis = jointAxisIdx_;
-	tmpAxis.insert(tmpAxis.end(), appAxisIdx_.begin(), appAxisIdx_.end());
-	axisIdx.push_back(tmpAxis);
-	// ÊÀ½ç×ø±êÖá
-	tmpAxis = tcpPosAxisIdx_;
-	tmpAxis.insert(tmpAxis.end(), tcpAngleAxisIdx_.begin(), tcpAngleAxisIdx_.end());
-	tmpAxis.insert(tmpAxis.end(), appAxisIdx_.begin(), appAxisIdx_.end());
-	axisIdx.push_back(tmpAxis);
-	// ¹¤¾ß×ø±êÖá
-	axisIdx.push_back(tmpAxis);
+	// å…³èŠ‚è½´
+	axisIdx.push_back(fkAxis);
+	// ä¸–ç•Œåæ ‡è½´
+	axisIdx.push_back(ikAxis);
+	// å·¥å…·åæ ‡è½´
+	axisIdx.push_back(ikAxis);
 
 	int ret = 0;
 	if (type < 0|| type >= axisIdx.size() || idx < 0 || idx >= axisIdx[type].size()) {
 		return -1;
 	}
 
-	// ÔË¶¯ÀàĞÍÓëÖáºÅ²»Æ¥Åä
+	// è¿åŠ¨ç±»å‹ä¸è½´å·ä¸åŒ¹é…
 	float kinematics = 0.0;
 	ZAux_Direct_GetTable(handle_, 1003, 1, &kinematics);
-	// ¿Õ¼äÔË¶¯(1) + Õı½âÄ£Ê½(1)
+	// ç©ºé—´è¿åŠ¨(1) + æ­£è§£æ¨¡å¼(1)
 	if (type > 0 && std::fabs(kinematics - 1) < 1e-3) {
 		return -2;
 	}
-	// ¹Ø½ÚÔË¶¯(0) + Äæ½âÄ£Ê½(-1)
+	// å…³èŠ‚è¿åŠ¨(0) + é€†è§£æ¨¡å¼(-1)
 	else if (type == 0 && kinematics < 0) {
 		return -2;
 	}
 
-	// VMOVE µã¶¯
+	// VMOVE ç‚¹åŠ¨
 	if (type < 2) {
-		// ÔË¶¯½áÊø
+		// è¿åŠ¨ç»“æŸ
 		if (dir == 0) {
 			ret = ZAux_Direct_Single_Cancel(handle_, axisIdx[type][idx], 4);
 		}
-		// ÕıÏòÔË¶¯
+		// æ­£å‘è¿åŠ¨
 		else if (dir > 0) {
 			ret = ZAux_Direct_Single_Vmove(handle_, axisIdx[type][idx], 1);
 		}
-		// ¸ºÏòÔË¶¯
+		// è´Ÿå‘è¿åŠ¨
 		else {
 			ret = ZAux_Direct_Single_Vmove(handle_, axisIdx[type][idx], -1);
 		}
 	}
-	// MOVE µã¶¯
+	// MOVE ç‚¹åŠ¨
 	else {
-		// µ±Ç°×ËÌ¬Å·À­½Ç
+		// å½“å‰å§¿æ€æ¬§æ‹‰è§’
 		std::vector<float> euler;
-		ret = get_axis_param(tcpAngleAxisIdx_, "DPOS", euler);
+		ret = get_axis_param(tcpAngleAxisIdx, "DPOS", euler);
 
-		// ¼ÆËãµ±Ç°·½Ïò
+		// è®¡ç®—å½“å‰æ–¹å‘
 		//Eigen::Matrix3f trans = DiscreteTrajectory<float>::RzyxToRotMat(euler[5], euler[4], euler[3])
 	}
 
 	return ret;
 }
-
 
 int32 ZauxRobot::set_manual_SpeedRatio(float speedRatio) {
 	float readVal;
@@ -278,11 +412,11 @@ int32 ZauxRobot::set_manual_SpeedRatio(float speedRatio) {
 	if (ret != 0)
 		return handle_zaux_error(ret);
 
-	// Äæ½â
+	// é€†è§£
 	if (std::fabs(readVal + 1) < 1e-2) {
-		// ËÙ¶È: ¹Ø½Ú + ¸½¼ÓÖá + Î»ÖÃ + ×ËÌ¬
-		std::vector<float> curSpeed(appAxisIdx_.size() + tcpPosAxisIdx_.size() + tcpAngleAxisIdx_.size(), 0);
-		// ¹Ø½ÚËÙ¶È¼Ä´æÆ÷
+		// æœ€å¤§æœ«ç«¯é€Ÿåº¦
+		std::vector<float> curSpeed(ikAxis.size(), 0);
+		// æœ«ç«¯é€Ÿåº¦å¯„å­˜å™¨
 		std::vector<int> jointSpeedVR = { 83,84,85, 1077,1078,1079,1080,1081,1082 };
 
 		ret = get_axis_param(jointSpeedVR, "VR", curSpeed);
@@ -293,23 +427,19 @@ int32 ZauxRobot::set_manual_SpeedRatio(float speedRatio) {
 			curSpeed[i] *= speedRatio;
 		}
 
-		// ¹Ø½Ú+¸½¼ÓÖáÖáºÅ
-		std::vector<int> axisIdx = appAxisIdx_;
-		axisIdx.insert(axisIdx.end(), tcpPosAxisIdx_.begin(), tcpPosAxisIdx_.end());
-		axisIdx.insert(axisIdx.end(), tcpAngleAxisIdx_.begin(), tcpAngleAxisIdx_.end());
-		// ĞŞ¸Ä¹Ø½ÚËÙ¶È
-		ret = set_axis_param(axisIdx, "SPEED", curSpeed);
+		// ä¿®æ”¹æœ«ç«¯é€Ÿåº¦
+		ret = set_axis_param(ikAxis, "SPEED", curSpeed);
 		if (ret != 0)
 			return handle_zaux_error(ret);
 
-		// ĞŞ¸ÄÕı½â
+		// ä¿®æ”¹æ­£è§£
 		speedRatio = 1.0;
 	}
 
-	// Õı½â
-	// ËÙ¶È: ¹Ø½Ú + ¸½¼ÓÖá
-	std::vector<float> curSpeed(jointAxisIdx_.size() + appAxisIdx_.size(), 0);
-	// ¹Ø½ÚËÙ¶È¼Ä´æÆ÷
+	// æ­£è§£
+	// é€Ÿåº¦: å…³èŠ‚ + é™„åŠ è½´
+	std::vector<float> curSpeed(fkAxis.size(), 0);
+	// å…³èŠ‚é€Ÿåº¦å¯„å­˜å™¨
 	std::vector<int> jointSpeedVR = { 77,78,79,80,81,82,83,84,85 };
 
 	ret = get_axis_param(jointSpeedVR, "VR", curSpeed);
@@ -320,11 +450,8 @@ int32 ZauxRobot::set_manual_SpeedRatio(float speedRatio) {
 		curSpeed[i] *= speedRatio;
 	}
 
-	// ¹Ø½Ú+¸½¼ÓÖáÖáºÅ
-	std::vector<int> axisIdx = jointAxisIdx_;
-	axisIdx.insert(axisIdx.end(), appAxisIdx_.begin(), appAxisIdx_.end());
-	// ĞŞ¸Ä¹Ø½ÚËÙ¶È
-	ret = set_axis_param(axisIdx, "SPEED", curSpeed);
+	// ä¿®æ”¹å…³èŠ‚é€Ÿåº¦
+	ret = set_axis_param(fkAxis, "SPEED", curSpeed);
 
 	return 0;
 }
@@ -332,7 +459,8 @@ int32 ZauxRobot::set_manual_SpeedRatio(float speedRatio) {
 int32 ZauxRobot::set_auto_SpeedRatio(float speedRatio) {
 	int ret = 0;
 
-	ret = set_axis_param({ jointAxisIdx_[0], tcpPosAxisIdx_[0], swingAxisIdx_[0] }, "SPEED_RATIO", { speedRatio, speedRatio, speedRatio });
+	//ret = set_axis_param({ excuteAxis[0] }, "SPEED_RATIO", { speedRatio });
+	ret = set_axis_param({ jointAxisIdx[0], tcpPosAxisIdx[0], swingAxisIdx[0] }, "SPEED_RATIO", { speedRatio, speedRatio, speedRatio });
 
 	return handle_zaux_error(ret);
 }
@@ -340,27 +468,26 @@ int32 ZauxRobot::set_auto_SpeedRatio(float speedRatio) {
 int32 ZauxRobot::set_acceleration_time(float time) {
 	int ret = 0;
 
-	// ËÙ¶È: ¹Ø½Ú + ¸½¼ÓÖá + Î»ÖÃ + ×ËÌ¬
-	std::vector<float> curSpeed(jointAxisIdx_.size() + appAxisIdx_.size() + tcpPosAxisIdx_.size() + tcpAngleAxisIdx_.size(), 0);
-	// ¹Ø½ÚËÙ¶È¼Ä´æÆ÷
+	// é€Ÿåº¦: å…³èŠ‚ + é™„åŠ è½´ + ä½ç½® + å§¿æ€
+	std::vector<float> curSpeed(jointAxisIdx.size() + appAxisIdx.size() + tcpPosAxisIdx.size() + tcpAngleAxisIdx.size(), 0);
+	// å…³èŠ‚é€Ÿåº¦å¯„å­˜å™¨
 	std::vector<int> jointSpeedVR = { 77,78,79,80,81,82,83,84,85, 1077,1078,1079,1080,1081,1082 };
 
 	ret = get_axis_param(jointSpeedVR, "VR", curSpeed);
 	if (ret != 0)
 		return handle_zaux_error(ret);
 
-	// ËÙ¶È / ¼ÓËÙÊ±¼ä = ¼ÓËÙ¶È
+	// é€Ÿåº¦ / åŠ é€Ÿæ—¶é—´ = åŠ é€Ÿåº¦
 	for (size_t i = 0; i < curSpeed.size(); ++i) {
 		curSpeed[i] /= time;
 	}
 
-	// ¹Ø½Ú+¸½¼ÓÖáÖáºÅ
-	std::vector<int> axisIdx = jointAxisIdx_;
-	axisIdx.insert(axisIdx.end(), appAxisIdx_.begin(), appAxisIdx_.end());
-	axisIdx.insert(axisIdx.end(), tcpPosAxisIdx_.begin(), tcpPosAxisIdx_.end());
-	axisIdx.insert(axisIdx.end(), tcpAngleAxisIdx_.begin(), tcpAngleAxisIdx_.end());
+	// å…³èŠ‚ + é™„åŠ è½´ + TCPä½ç½® + TCPå§¿æ€
+	std::vector<int> axisIdx = fkAxis;
+	axisIdx.insert(axisIdx.end(), tcpPosAxisIdx.begin(), tcpPosAxisIdx.end());
+	axisIdx.insert(axisIdx.end(), tcpAngleAxisIdx.begin(), tcpAngleAxisIdx.end());
 
-	// ĞŞ¸Ä¹Ø½Ú¼Ó¼õËÙ¶È
+	// ä¿®æ”¹å…³èŠ‚åŠ å‡é€Ÿåº¦
 	ret = set_axis_param(axisIdx, "ACCEL", curSpeed);
 	if (ret != 0)
 		return handle_zaux_error(ret);
@@ -372,19 +499,18 @@ int32 ZauxRobot::set_acceleration_time(float time) {
 }
 
 
-/* ******************************** »ù´¡ÔË¶¯Ö¸Áî·â×° *********************************
-* @brief ÕıÔË¶¯½Ó¿Ú·â×°¡£Zmotion -> ZauxRobot
+/* ******************************** åŸºç¡€è¿åŠ¨æŒ‡ä»¤å°è£… *********************************
+* @brief æ­£è¿åŠ¨æ¥å£å°è£…ã€‚Zmotion -> ZauxRobot
 */
-
-// »ù´¡ÔË¶¯Ö¸Áî·â×°£ºmove
+// åŸºç¡€è¿åŠ¨æŒ‡ä»¤å°è£…ï¼šmove
 int32 ZauxRobot::move(const std::vector<int>& axis, const std::vector<float>& relMove, float speed) {
-	// ¹ì¼£µãÎ¬¶ÈÓëÇı¶¯ÖáÎ¬¶ÈµÄ½ÏĞ¡Öµ
+	// è½¨è¿¹ç‚¹ç»´åº¦ä¸é©±åŠ¨è½´ç»´åº¦çš„è¾ƒå°å€¼
 	size_t num = std::min(relMove.size(), axis.size());
 	if (num < 1)
 		return 1;
 
 	int ret = 0;
-	// Éú³ÉÃüÁî
+	// ç”Ÿæˆå‘½ä»¤
 	char cmdbuff[2048], tempbuff[2048], cmdbuffAck[2048];
 
 	strcpy(cmdbuff, "BASE(");
@@ -396,7 +522,7 @@ int32 ZauxRobot::move(const std::vector<int>& axis, const std::vector<float>& re
 	strcat(cmdbuff, tempbuff);
 	strcat(cmdbuff, "\n");
 
-	// µ¥¶ÀÉèÖÃËÙ¶È
+	// å•ç‹¬è®¾ç½®é€Ÿåº¦
 	if (speed > 0) {
 		sprintf(tempbuff, "FORCE_SPEED(%d) = %f", axis[0], speed);
 		strcat(cmdbuff, tempbuff);
@@ -410,19 +536,20 @@ int32 ZauxRobot::move(const std::vector<int>& axis, const std::vector<float>& re
 	sprintf(tempbuff, "%f)", relMove[num - 1]);
 	strcat(cmdbuff, tempbuff);
 
-	//µ÷ÓÃÃüÁîÖ´ĞĞº¯Êı
+	//è°ƒç”¨å‘½ä»¤æ‰§è¡Œå‡½æ•°
 	ret = ZAux_DirectCommand(handle_, cmdbuff, cmdbuffAck, 2048);
 	return handle_zaux_error(ret);
 }
+
 // moveABS
 int32 ZauxRobot::moveABS(const std::vector<int>& axis, const std::vector<float>& endMove, float speed) {
-	// ¹ì¼£µãÎ¬¶ÈÓëÇı¶¯ÖáÎ¬¶ÈµÄ½ÏĞ¡Öµ
+	// è½¨è¿¹ç‚¹ç»´åº¦ä¸é©±åŠ¨è½´ç»´åº¦çš„è¾ƒå°å€¼
 	size_t num = std::min(endMove.size(), axis.size());
 	if (num < 1)
 		return 1;
 
 	int ret = 0;
-	// Éú³ÉÃüÁî
+	// ç”Ÿæˆå‘½ä»¤
 	char cmdbuff[2048], tempbuff[2048], cmdbuffAck[2048];
 
 	strcpy(cmdbuff, "BASE(");
@@ -434,7 +561,7 @@ int32 ZauxRobot::moveABS(const std::vector<int>& axis, const std::vector<float>&
 	strcat(cmdbuff, tempbuff);
 	strcat(cmdbuff, "\n");
 
-	// µ¥¶ÀÉèÖÃËÙ¶È
+	// å•ç‹¬è®¾ç½®é€Ÿåº¦
 	if (speed > 0) {
 		sprintf(tempbuff, "FORCE_SPEED(%d) = %f", axis[0], speed);
 		strcat(cmdbuff, tempbuff);
@@ -448,12 +575,12 @@ int32 ZauxRobot::moveABS(const std::vector<int>& axis, const std::vector<float>&
 	sprintf(tempbuff, "%f)", endMove[num - 1]);
 	strcat(cmdbuff, tempbuff);
 
-	//µ÷ÓÃÃüÁîÖ´ĞĞº¯Êı
+	//è°ƒç”¨å‘½ä»¤æ‰§è¡Œå‡½æ•°
 	ret = ZAux_DirectCommand(handle_, cmdbuff, cmdbuffAck, 2048);
 	return handle_zaux_error(ret);
 }
 
-// »ñÈ¡ÖáºÅĞÅÏ¢
+// è·å–è½´å·ä¿¡æ¯
 int32 ZauxRobot::get_axis_param(const std::vector<int>& axisList, char* paramName, std::vector<float>& paramList) {
 	char  cmdbuff[2048], tempbuff[2048], cmdbuffAck[2048];
 	int ret = 0;
@@ -463,7 +590,7 @@ int32 ZauxRobot::get_axis_param(const std::vector<int>& axisList, char* paramNam
 	}
 	paramList = std::vector<float>(axisList.size(), 0);
 
-	//Éú³ÉÃüÁî
+	//ç”Ÿæˆå‘½ä»¤
 	sprintf(cmdbuff, "?%s(%d)", paramName, axisList[0]);
 	for (size_t i = 1; i < axisList.size(); ++i) {
 		sprintf(tempbuff, ",%s(%d)", paramName, axisList[i]);
@@ -472,7 +599,7 @@ int32 ZauxRobot::get_axis_param(const std::vector<int>& axisList, char* paramNam
 
 	int32 iresult = ZAux_DirectCommand(handle_, cmdbuff, cmdbuffAck, 2048);
 
-	// ÅĞ¶Ï·µ»Ø×´Ì¬
+	// åˆ¤æ–­è¿”å›çŠ¶æ€
 	if (ERR_OK != iresult) {
 		return handle_zaux_error(iresult);
 	}
@@ -480,7 +607,7 @@ int32 ZauxRobot::get_axis_param(const std::vector<int>& axisList, char* paramNam
 		return handle_zaux_error(ERR_NOACK);
 	}
 
-	// ½âÎö·µ»ØÖµ
+	// è§£æè¿”å›å€¼
 	std::stringstream ackStr(cmdbuffAck);
 	std::string word;
 	// Extract word from the stream
@@ -495,7 +622,7 @@ int32 ZauxRobot::get_axis_param(const std::vector<int>& axisList, char* paramNam
 	return handle_zaux_error(ret);
 }
 
-// ÉèÖÃÖáºÅĞÅÏ¢
+// è®¾ç½®è½´å·ä¿¡æ¯
 int32 ZauxRobot::set_axis_param(const std::vector<int>& axisList, char* paramName, const std::vector<float>& paramList, int principal) {
 	char  cmdbuff[2048], tempbuff[2048], cmdbuffAck[2048];
 	int ret = 0;
@@ -504,7 +631,7 @@ int32 ZauxRobot::set_axis_param(const std::vector<int>& axisList, char* paramNam
 		return 1;
 	}
 
-	// Á¢¼´ÉèÖÃ
+	// ç«‹å³è®¾ç½®
 	if (principal < 0) {
 		sprintf(cmdbuff, "%s(%d)=%f", paramName, axisList[0], paramList[0]);
 		for (size_t i = 1; i < axisList.size(); ++i) {
@@ -512,7 +639,7 @@ int32 ZauxRobot::set_axis_param(const std::vector<int>& axisList, char* paramNam
 			strcat(cmdbuff, tempbuff);
 		}
 	}
-	// »º³åÖĞÉèÖÃ
+	// ç¼“å†²ä¸­è®¾ç½®
 	else {
 		sprintf(cmdbuff, "MOVE_PARA(%s,%d,%f) axis(%d)", paramName, axisList[0], paramList[0], principal);
 		for (size_t i = 1; i < axisList.size(); ++i) {
@@ -526,11 +653,10 @@ int32 ZauxRobot::set_axis_param(const std::vector<int>& axisList, char* paramNam
 }
 
 
-/* ******************************** ¹¤Òµ»úĞµ±Û³£ÓÃÖ¸Áî·â×° *********************************
-* @brief ³£ÓÃÖ¸Áî½Ó¿ÚµÄÊµÏÖ¡£ZauxRobot -> ¹¤Òµ»úĞµ±Û³£ÓÃÖ¸Áî
+/* ******************************** å·¥ä¸šæœºæ¢°è‡‚å¸¸ç”¨æŒ‡ä»¤å°è£… *********************************
+* @brief å¸¸ç”¨æŒ‡ä»¤æ¥å£çš„å®ç°ã€‚ZauxRobot -> å·¥ä¸šæœºæ¢°è‡‚å¸¸ç”¨æŒ‡ä»¤
 */
-
-// µãµ½µãÍ¬²½ÔË¶¯£ºmove_ptp
+// ç‚¹åˆ°ç‚¹åŒæ­¥è¿åŠ¨ï¼šmove_ptp
 int32 ZauxRobot::move_ptp(const std::vector<float>& relEndMove, float speedRatio) {
 	std::vector<int> axisIdx = { 0,1,2,3,4,5,6,7,8 };
 
@@ -546,7 +672,7 @@ int32 ZauxRobot::move_ptp(const std::vector<float>& relEndMove, float speedRatio
 	strcat(cmdbuff, tempbuff);
 	strcat(cmdbuff, "\n");
 	
-	// ÉèÖÃËÙ¶È
+	// è®¾ç½®é€Ÿåº¦
 	if (speedRatio > 0) {
 		sprintf(tempbuff, "SPEED_RATIO = %f\n", speedRatio);
 		strcat(cmdbuff, tempbuff);
@@ -560,11 +686,10 @@ int32 ZauxRobot::move_ptp(const std::vector<float>& relEndMove, float speedRatio
 	sprintf(tempbuff, "%f)", relEndMove[num - 1]);
 	strcat(cmdbuff, tempbuff);
 
-	//µ÷ÓÃÃüÁîÖ´ĞĞº¯Êı
+	//è°ƒç”¨å‘½ä»¤æ‰§è¡Œå‡½æ•°
 	ret = ZAux_DirectCommand(handle_, cmdbuff, cmdbuffAck, 2048);
 	return handle_zaux_error(ret);
 }
-
 
 int32 ZauxRobot::move_ptp_abs(const std::vector<float>& endMove, float speedRatio) {
 	std::vector<int> axisIdx = { 0,1,2,3,4,5,6,7,8 };
@@ -581,7 +706,7 @@ int32 ZauxRobot::move_ptp_abs(const std::vector<float>& endMove, float speedRati
 	strcat(cmdbuff, tempbuff);
 	strcat(cmdbuff, "\n");
 
-	// ÉèÖÃËÙ¶È
+	// è®¾ç½®é€Ÿåº¦
 	if (speedRatio > 0) {
 		sprintf(tempbuff, "SPEED_RATIO = %f\n", speedRatio);
 		strcat(cmdbuff, tempbuff);
@@ -595,34 +720,33 @@ int32 ZauxRobot::move_ptp_abs(const std::vector<float>& endMove, float speedRati
 	sprintf(tempbuff, "%f)", endMove[num - 1]);
 	strcat(cmdbuff, tempbuff);
 
-	//µ÷ÓÃÃüÁîÖ´ĞĞº¯Êı
+	//è°ƒç”¨å‘½ä»¤æ‰§è¡Œå‡½æ•°
 	ret = ZAux_DirectCommand(handle_, cmdbuff, cmdbuffAck, 2048);
 	return handle_zaux_error(ret);
 }
 
-int32 ZauxRobot::moveJ(const std::vector<float>& relEndMove, float speedRatio) {
+int32 ZauxRobot::moveJ(const std::vector<float>& relEndMove, float speedRatio, bool replace) {
+	std::vector<int> axis = replace ? excuteAxis : fkAxis;
+	// è½¨è¿¹ç‚¹ç»´åº¦ä¸é©±åŠ¨è½´ç»´åº¦çš„è¾ƒå°å€¼
+	size_t num = std::min(relEndMove.size(), axis.size());
+	axis.assign(axis.begin(), axis.begin() + num);
 	int ret = 0;
-	
-	// ÊµÖá: ¹Ø½ÚÖá + ¸½¼ÓÖá
-	std::vector<int> realAxis = jointAxisIdx_;
-	realAxis.insert(realAxis.end(), appAxisIdx_.begin(), appAxisIdx_.end());
 
-	// ¹ì¼£µãÎ¬¶ÈÓëÇı¶¯ÖáÎ¬¶ÈµÄ½ÏĞ¡Öµ
-	size_t num = (std::min)(relEndMove.size(), realAxis.size());
-
-	std::vector<float> moveCmd(realAxis.size(), 0);
+	std::vector<float> moveCmd(num, 0);
 	for (size_t i = 0; i < num; ++i) {
 		moveCmd[i] = relEndMove[i];
 	}
 
-	// »ñÈ¡¸÷¸öÖáËÙ¶È
+	// è·å–å„ä¸ªè½´é€Ÿåº¦
 	std::vector<float> axisSpeed;
-	ret = get_axis_param(realAxis, (char*)"SPEED", axisSpeed);
+	ret = get_axis_param(fkAxis, (char*)"SPEED", axisSpeed);
 
-	// ¼ÆËãÊ±¼äÔË¶¯Ê±¼ä×î¾ÃµÄÖá
+	// è®¡ç®—æ—¶é—´è¿åŠ¨æ—¶é—´æœ€ä¹…çš„è½´
 	float maxTime = 0.0;
 	int axisIdx = 0;
 	for (size_t i = 0; i < num; ++i) {
+		// é˜²æ­¢é™¤é›¶
+		axisSpeed[i] = axisSpeed[i] < 1e-3 ? 1e3 : axisSpeed[i];
 		float tmpTime = std::fabs(moveCmd[i]) / axisSpeed[i];
 		if (tmpTime > maxTime) {
 			maxTime = tmpTime;
@@ -630,116 +754,64 @@ int32 ZauxRobot::moveJ(const std::vector<float>& relEndMove, float speedRatio) {
 		}
 	}
 
-	// Ö»¼ÆËã×îÂıÖáµÄËÙ¶È
-	std::vector<float> interpVec(transAxisIdx_.size(), 0);
-	interpVec[axisIdx] = 1;
-	ret = set_axis_param(transAxisIdx_, (char*)"INTERP_FACTOR", interpVec);
-	if (ret != 0)
-		return handle_zaux_error(ret);
-
-	// ÉèÖÃÖáÔË¶¯ËÙ¶È
-	ret = ZAux_Direct_SetForceSpeed(handle_, transAxisIdx_[0], axisSpeed[axisIdx] * speedRatio);
-
-	// ·¢ËÍÔË¶¯Ö¸Áî
-	ret = moveL(transAxisIdx_, moveCmd);
-	if (ret != 0)
-		return handle_zaux_error(ret);
-
-	return handle_zaux_error(ret);
-}
-int32 ZauxRobot::moveJ(const std::vector<int>& axis, const std::vector<float>& relEndMove, float speedRatio) {
-	int ret = 0;
-
-	// ¹ì¼£µãÎ¬¶ÈÓëÇı¶¯ÖáÎ¬¶ÈµÄ½ÏĞ¡Öµ
-	size_t num = (std::min)(relEndMove.size(), axis.size());
-
-	// »ñÈ¡¸÷¸öÖáËÙ¶È
-	std::vector<float> axisSpeed;
-	ret = get_axis_param(axis, (char*)"SPEED", axisSpeed);
-
-	// ¼ÆËãÊ±¼äÔË¶¯Ê±¼ä×î¾ÃµÄÖá
-	float maxTime = 0.0;
-	int axisIdx = 0;
-	for (size_t i = 0; i < num; ++i) {
-		float tmpTime = std::fabs(relEndMove[i]) / axisSpeed[i];
-		if (tmpTime > maxTime) {
-			maxTime = tmpTime;
-			axisIdx = i;
-		}
-	}
-
-	// Ö»¼ÆËã×îÂıÖáµÄËÙ¶È
+	// åªè®¡ç®—æœ€æ…¢è½´çš„é€Ÿåº¦
 	std::vector<float> interpVec(axis.size(), 0);
 	interpVec[axisIdx] = 1;
 	ret = set_axis_param(axis, (char*)"INTERP_FACTOR", interpVec);
 	if (ret != 0)
 		return handle_zaux_error(ret);
 
-	// ÉèÖÃÖáÔË¶¯ËÙ¶È
-	ret = ZAux_Direct_SetForceSpeed(handle_, axis[0], axisSpeed[axisIdx] * speedRatio);
+	// è®¾ç½®è½´è¿åŠ¨é€Ÿåº¦
+	if (speedRatio > 0) {
+		ret = ZAux_Direct_SetForceSpeed(handle_, axis[0], axisSpeed[axisIdx] * speedRatio);
+	}
 
-	// ·¢ËÍÔË¶¯Ö¸Áî
-	ret = moveL(axis, relEndMove);
+	// å‘é€è¿åŠ¨æŒ‡ä»¤
+	ret = moveL(axis, moveCmd);
 	if (ret != 0)
 		return handle_zaux_error(ret);
 
 	return handle_zaux_error(ret);
 }
+int32 ZauxRobot::moveJ(const std::vector<int>& axis, const std::vector<float>& relEndMove, float speedRatio) {
+	return 0;
+}
 
 
-int32 ZauxRobot::moveJ_abs(const std::vector<float>& endMove, float speedRatio) {
+int32 ZauxRobot::moveJ_abs(const std::vector<float>& endMove, float speedRatio, bool replace) {
+	std::vector<int> axis = replace ? excuteAxis : fkAxis;
+	// è½¨è¿¹ç‚¹ç»´åº¦ä¸é©±åŠ¨è½´ç»´åº¦çš„è¾ƒå°å€¼
+	size_t num = std::min(endMove.size(), axis.size());
+	axis.assign(axis.begin(), axis.begin() + num);
 	int ret = 0;
 
-	// ÊµÖá: ¹Ø½ÚÖá + ¸½¼ÓÖá
-	std::vector<int> realAxis = jointAxisIdx_;
-	realAxis.insert(realAxis.end(), appAxisIdx_.begin(), appAxisIdx_.end());
+	// è·å–å„è½´ç¼“å†²æœ€åä½ç½®
+	std::vector<float> relEndMove(fkAxis.size(), 0);
+	ret = get_axis_param(fkAxis, (char*)"ENDMOVE_BUFFER", relEndMove);
 
-	// ¹ì¼£µãÎ¬¶ÈÓëÇı¶¯ÖáÎ¬¶ÈµÄ½ÏĞ¡Öµ
-	size_t num = (std::min)(endMove.size(), realAxis.size());
-
-	// »ñÈ¡¸÷Öá»º³å×îºóÎ»ÖÃ
-	std::vector<float> relEndMove(realAxis.size(), 0);
-	ret = get_axis_param(realAxis, (char*)"ENDMOVE_BUFFER", relEndMove);
-
-	// ×ª»»µ½Ïà¶ÔÔË¶¯
+	// è½¬æ¢åˆ°ç›¸å¯¹è¿åŠ¨
 	for (size_t i = 0; i < num; ++i) {
 		relEndMove[i] = endMove[i] - relEndMove[i];
 	}
 
-	ret = moveJ(relEndMove, speedRatio);
+	ret = moveJ(relEndMove, speedRatio, replace);
 
 	return ret;
 }
 int32 ZauxRobot::moveJ_abs(const std::vector<int>& axis, const std::vector<float>& endMove, float speedRatio) {
-	int ret = 0;
-
-	// ¹ì¼£µãÎ¬¶ÈÓëÇı¶¯ÖáÎ¬¶ÈµÄ½ÏĞ¡Öµ
-	size_t num = (std::min)(endMove.size(), axis.size());
-
-	// »ñÈ¡¸÷Öá»º³å×îºóÎ»ÖÃ
-	std::vector<float> relEndMove(num, 0);
-	ret = get_axis_param(axis, (char*)"ENDMOVE_BUFFER", relEndMove);
-
-	// ×ª»»µ½Ïà¶ÔÔË¶¯
-	for (size_t i = 0; i < num; ++i) {
-		relEndMove[i] = endMove[i] - relEndMove[i];
-	}
-
-	ret = moveJ(axis, relEndMove, speedRatio);
-
-	return ret;
+	return 0;
 }
 
 
 int32 ZauxRobot::moveL(const std::vector<int>& axis, const std::vector<float>& relEndMove) {
-	// ¹ì¼£µãÎ¬¶ÈÓëÇı¶¯ÖáÎ¬¶ÈµÄ½ÏĞ¡Öµ
+	// è½¨è¿¹ç‚¹ç»´åº¦ä¸é©±åŠ¨è½´ç»´åº¦çš„è¾ƒå°å€¼
 	size_t num = (std::min)(relEndMove.size(), axis.size());
 	int ret = 0;
 	if (num < 1) {
 		return 1;
 	}
 
-	// Éú³ÉÃüÁî
+	// ç”Ÿæˆå‘½ä»¤
 	char cmdbuff[2048], tempbuff[2048], cmdbuffAck[2048];
 
 	strcpy(cmdbuff, "BASE(");
@@ -760,28 +832,55 @@ int32 ZauxRobot::moveL(const std::vector<int>& axis, const std::vector<float>& r
 	strcat(cmdbuff, tempbuff);
 
 	//std::cout << cmdbuff << std::endl;
-	//µ÷ÓÃÃüÁîÖ´ĞĞº¯Êı
+	//è°ƒç”¨å‘½ä»¤æ‰§è¡Œå‡½æ•°
 	ret = ZAux_DirectCommand(handle_, cmdbuff, cmdbuffAck, 2048);
 	return handle_zaux_error(ret);
 }
+int32 ZauxRobot::moveL(const std::vector<int>& axis, const std::vector<float>& begPoint, std::vector<float>& endPoint) {
+	// è½¨è¿¹ç‚¹ç»´åº¦ä¸é©±åŠ¨è½´ç»´åº¦çš„è¾ƒå°å€¼
+	size_t num = (std::min)(begPoint.size(), axis.size());
+	int ret = 0;
 
+	// ç»ˆç‚¹åˆ°èµ·ç‚¹çš„ç›¸å¯¹è¿åŠ¨
+	std::vector<float> relEndMove(num, 0);
+	for (size_t i = 0; i < num; ++i) {
+		relEndMove[i] = endPoint[i] - begPoint[i];
+	}
+
+	// æ¬§æ‹‰è§’è½¬æ¢åˆ°ç›¸å¯¹è¿åŠ¨: beg -> mid -> end
+	Eigen::Vector3f begEuler = Eigen::Vector3f(begPoint[3], begPoint[4], begPoint[5]);
+	Eigen::Vector3f endEuler = Eigen::Vector3f(endPoint[3], endPoint[4], endPoint[5]);
+	Eigen::Vector3f relEuler = get_zyx_euler_distance(begEuler, endEuler);
+	for (size_t i = 0; i < 3; ++i) {
+		// æ¬§æ‹‰è§’ç›¸å¯¹å€¼
+		relEndMove[3 + i] = relEuler[i];
+		// ç»ˆç‚¹æ¬§æ‹‰è§’è½¬æ¢åˆ°ä¸èµ·ç‚¹åŒä¾§
+		endPoint[3 + i] = endEuler[i];
+	}
+
+	// ç›¸å¯¹è¿åŠ¨
+	ret = this->move(axis, relEndMove);
+	if (ret != 0)
+		return handle_zaux_error(ret);
+	return 0;
+}
 
 int32 ZauxRobot::moveC(const std::vector<int>& axis, const std::vector<float>& begPoint, std::vector<float>& midPoint,
 						 std::vector<float>& endPoint, int imode) {
-	// ¹ì¼£µãÎ¬¶ÈÓëÇı¶¯ÖáÎ¬¶ÈµÄ½ÏĞ¡Öµ
+	// è½¨è¿¹ç‚¹ç»´åº¦ä¸é©±åŠ¨è½´ç»´åº¦çš„è¾ƒå°å€¼
 	size_t num = (std::min)(begPoint.size(), axis.size());
 
-	// ÖĞ¼äµãÏà¶ÔÖµ
+	// ä¸­é—´ç‚¹ç›¸å¯¹å€¼
 	std::vector<float> relMidMove(num);
 	for (size_t i = 0; i < num; ++i) {
 		relMidMove[i] = midPoint[i] - begPoint[i];
 	}
-	// ÖÕµãÏà¶ÔÖµ
+	// ç»ˆç‚¹ç›¸å¯¹å€¼
 	std::vector<float> relEndMove(num);
 	for (size_t i = 0; i < num; ++i) {
 		relEndMove[i] = endPoint[i] - begPoint[i];
 	}
-	// Ïà¶Ô½Ç¶È: beg -> mid -> end
+	// ç›¸å¯¹è§’åº¦: beg -> mid -> end
 	Eigen::Vector3f begEuler, endEuler, relEuler(0,0,0);
 	begEuler = Eigen::Vector3f(begPoint[3], begPoint[4], begPoint[5]);
 	if (imode == 0) {
@@ -792,15 +891,15 @@ int32 ZauxRobot::moveC(const std::vector<int>& axis, const std::vector<float>& b
 	endEuler = Eigen::Vector3f(endPoint[3], endPoint[4], endPoint[5]);
 	relEuler += get_zyx_euler_distance(begEuler, endEuler);
 	for (size_t i = 0; i < 3; ++i) {
-		// Å·À­½ÇÏà¶ÔÖµ
+		// æ¬§æ‹‰è§’ç›¸å¯¹å€¼
 		relEndMove[3 + i] = relEuler[i];
-		// ÖĞ¼äµãÅ·À­½Ç×ª»»µ½ÓëÆğµãÍ¬²à
+		// ä¸­é—´ç‚¹æ¬§æ‹‰è§’è½¬æ¢åˆ°ä¸èµ·ç‚¹åŒä¾§
 		midPoint[3 + i] = begEuler[i];
-		// ÖÕµãÅ·À­½Ç×ª»»µ½ÓëÆğµãÍ¬²à
+		// ç»ˆç‚¹æ¬§æ‹‰è§’è½¬æ¢åˆ°ä¸èµ·ç‚¹åŒä¾§
 		endPoint[3 + i] = endEuler[i];
 	}
 
-	// Éú³ÉÃüÁî
+	// ç”Ÿæˆå‘½ä»¤
 	char cmdbuff[2048], tempbuff[2048], cmdbuffAck[2048];
 
 	strcpy(cmdbuff, "BASE(");
@@ -820,42 +919,43 @@ int32 ZauxRobot::moveC(const std::vector<int>& axis, const std::vector<float>& b
 	}
 	strcat(cmdbuff, ")");
 	//std::cout << cmdbuff << std::endl;
-	//µ÷ÓÃÃüÁîÖ´ĞĞº¯Êı
+	//è°ƒç”¨å‘½ä»¤æ‰§è¡Œå‡½æ•°
 	int ret =  ZAux_DirectCommand(handle_, cmdbuff, cmdbuffAck, 2048);
 	return handle_zaux_error(ret);
 }
 
 
+// æ‘†ç„ŠåŠŸèƒ½
 int32 ZauxRobot::save_table(size_t startIdx, size_t num, const std::string& path) {
 	if (num == 0) {
 		return 0;
 	}
 	int ret = 0;
 
-	// µ¥´Î×î´ó¶ÁÈ¡ÊıÁ¿
+	// å•æ¬¡æœ€å¤§è¯»å–æ•°é‡
 	size_t maxNum = 1000;
-	// ¶ÁÈ¡»º³å
+	// è¯»å–ç¼“å†²
 	std::vector<float> tableData(maxNum, 0);
-	// ¶ÁÈ¡´ÎÊı
+	// è¯»å–æ¬¡æ•°
 	size_t times = std::floor(num / maxNum);
-	// Êä³öÎÄ¼ş
+	// è¾“å‡ºæ–‡ä»¶
 	std::ofstream out(path, std::ios::trunc);
 
 	for (size_t i = 0; i < times; ++i) {
-		// ¶ÁÈ¡Êı¾İ
+		// è¯»å–æ•°æ®
 		ret = ZAux_Direct_GetTable(handle_, startIdx + maxNum * i, maxNum, tableData.data());
-		// ÅĞ¶Ï·µ»Ø×´Ì¬
+		// åˆ¤æ–­è¿”å›çŠ¶æ€
 		if (ret != 0)
 			return handle_zaux_error(ret);
-		// ±£´æµ½ÎÄ¼ş
+		// ä¿å­˜åˆ°æ–‡ä»¶
 		for (const auto& data : tableData) {
 			out << data << std::endl;
 		}
 	}
 	
-	// Ê£ÓàÊı¾İ³¤¶È
+	// å‰©ä½™æ•°æ®é•¿åº¦
 	size_t remain = num - maxNum * times;
-	// ¶ÁÈ¡Ê£ÓàÊı¾İ
+	// è¯»å–å‰©ä½™æ•°æ®
 	ZAux_Direct_GetTable(handle_, startIdx + maxNum * times, remain, tableData.data());
 	for (size_t i = 0; i < remain; ++i) {
 		out << tableData[i] << std::endl;
@@ -866,42 +966,42 @@ int32 ZauxRobot::save_table(size_t startIdx, size_t num, const std::string& path
 
 
 int32 ZauxRobot::update_swing_table(const Weave& waveCfg) {
-	// Í¹ÂÖ±íÆğÊ¼Ë÷Òı
+	// å‡¸è½®è¡¨èµ·å§‹ç´¢å¼•
 	size_t sinTableBeg = 2000;
-	// Ò»¸ö°Ú¶¯ÖÜÆÚµÄ²åÖµµãÊı
+	// ä¸€ä¸ªæ‘†åŠ¨å‘¨æœŸçš„æ’å€¼ç‚¹æ•°
 	size_t numInterp = 100;
 	int ret = 0;
 	
 	std::vector<float> waveGenerator(numInterp, 0);
 
-	// *** »ñÈ¡µÄ°Úº¸²ÎÊı *************************************
-	// °Ú¶¯ÆµÂÊ
+	// *** è·å–çš„æ‘†ç„Šå‚æ•° *************************************
+	// æ‘†åŠ¨é¢‘ç‡
 	float freq = waveCfg.Freq;
-	// °Ú¶¯Õñ·ù
+	// æ‘†åŠ¨æŒ¯å¹…
 	float ampl = (waveCfg.LeftWidth + waveCfg.RightWidth) / 2;
-	// Í£Ö¹Ä£Ê½
+	// åœæ­¢æ¨¡å¼
 	int holdType = waveCfg.Dwell_type;
-	// »úÆ÷ÈËÍ£ÁôÊ±¼ä, °Ú¶¯Í£ÁôÊ±¼ä (½öÒ»¸öÉúĞ§)
+	// æœºå™¨äººåœç•™æ—¶é—´, æ‘†åŠ¨åœç•™æ—¶é—´ (ä»…ä¸€ä¸ªç”Ÿæ•ˆ)
 	float robotHoldTime = 0.0, swingHoldTime = 0.0;
 
-	// »úÆ÷ÈËÍ£Ö¹
+	// æœºå™¨äººåœæ­¢
 	if (holdType > 0) {
 		robotHoldTime = (waveCfg.Dwell_left + waveCfg.Dwell_right) / 2;
 	}
-	// °Ú¶¯Í£ÁôÊ±¼ä
+	// æ‘†åŠ¨åœç•™æ—¶é—´
 	else if (holdType == 0 && waveCfg.Dwell_left + waveCfg.Dwell_right > 0) {
 		swingHoldTime = waveCfg.Dwell_left + waveCfg.Dwell_right;
-		// ÖÜÆÚÊ±¼ä(ms)
+		// å‘¨æœŸæ—¶é—´(ms)
 		float totalTime = 1000 / freq + swingHoldTime;
-		// ËÄ·ÖÖ®Ò»°Ú¶¯ÖÜÆÚÕ¼ÓÃµÄ table ¸öÊı
+		// å››åˆ†ä¹‹ä¸€æ‘†åŠ¨å‘¨æœŸå ç”¨çš„ table ä¸ªæ•°
 		size_t numQuarter = numInterp * (1000 / freq) / totalTime / 4;
-		// ÓÒÍ£ÁôÊ±¼äÕ¼ÓÃµÄ table ¸öÊı
+		// å³åœç•™æ—¶é—´å ç”¨çš„ table ä¸ªæ•°
 		//size_t numRightHold = numInterp * waveCfg.Dwell_right / totalTime;
 		size_t numRightHold = (numInterp - 4 * numQuarter) * waveCfg.Dwell_right / swingHoldTime;
 
-		// »º³åÖĞĞ´ÈëÍ¹ÂÖ±í
+		// ç¼“å†²ä¸­å†™å…¥å‡¸è½®è¡¨
 		for (size_t i = 0; i < 4 * numQuarter; ++i) {
-			// ²åÖµµã¶ÔÓ¦µÄÆ«ÒÆ·ùÖµ
+			// æ’å€¼ç‚¹å¯¹åº”çš„åç§»å¹…å€¼
 			float tmp = std::sin(2 * M_PI * i / (4 * numQuarter - 1));
 			if (i < numQuarter) {
 				waveGenerator[i] = tmp;
@@ -922,14 +1022,14 @@ int32 ZauxRobot::update_swing_table(const Weave& waveCfg) {
 
 		sinTableBeg = 2100;
 		for (size_t i = 0; i < numInterp; ++i) {
-			ret = ZAux_Direct_MoveTable(handle_, swingAxisIdx_[0], sinTableBeg + i, waveGenerator[i]);
-			// ÅĞ¶Ï·µ»Ø×´Ì¬
+			ret = ZAux_Direct_MoveTable(handle_, excuteAxis[0], sinTableBeg + i, waveGenerator[i]);
+			// åˆ¤æ–­è¿”å›çŠ¶æ€
 			if (ret != 0)
 				return handle_zaux_error(ret);
 		}
 	}
 
-	// ×Ô¶¨Òå°Úº¸º¯Êı
+	// è‡ªå®šä¹‰æ‘†ç„Šå‡½æ•°
 
 	return handle_zaux_error(ret);
 }
@@ -939,19 +1039,19 @@ int32 ZauxRobot::swing_on(float vel, const Weave& waveCfg, const std::vector<flo
 	char  cmdbuff[2048], tempbuff[2048], cmdbuffAck[2048];
 	int ret = 0;
 
-	// Í¹ÂÖ±íÆğÊ¼Ë÷Òı
+	// å‡¸è½®è¡¨èµ·å§‹ç´¢å¼•
 	size_t sinTableBeg = 2000;
-	// Ò»¸ö°Ú¶¯ÖÜÆÚµÄ²åÖµµãÊı
+	// ä¸€ä¸ªæ‘†åŠ¨å‘¨æœŸçš„æ’å€¼ç‚¹æ•°
 	size_t numInterp = 100;
 
-	// *** »ñÈ¡µÄ°Úº¸²ÎÊı *************************************
-	// °Ú¶¯ÆµÂÊ
+	// *** è·å–çš„æ‘†ç„Šå‚æ•° *************************************
+	// æ‘†åŠ¨é¢‘ç‡
 	float freq = waveCfg.Freq;
-	// °Ú¶¯Õñ·ù
+	// æ‘†åŠ¨æŒ¯å¹…
 	float ampl = (waveCfg.LeftWidth + waveCfg.RightWidth) / 2;
-	// Í£Ö¹Ä£Ê½
+	// åœæ­¢æ¨¡å¼
 	int holdType = waveCfg.Dwell_type;
-	// »úÆ÷ÈËÍ£ÁôÊ±¼ä, °Ú¶¯Í£ÁôÊ±¼ä (½öÒ»¸öÉúĞ§)
+	// æœºå™¨äººåœç•™æ—¶é—´, æ‘†åŠ¨åœç•™æ—¶é—´ (ä»…ä¸€ä¸ªç”Ÿæ•ˆ)
 	float robotHoldTime = 0.0, swingHoldTime = 0.0;
 	if (holdType == 0) {
 		swingHoldTime = waveCfg.Dwell_left + waveCfg.Dwell_right;
@@ -960,16 +1060,16 @@ int32 ZauxRobot::swing_on(float vel, const Weave& waveCfg, const std::vector<flo
 	//sinTableBeg = holdType > 0 ? 2000 : 2100;
 	sinTableBeg = (holdType == 0 && waveCfg.Dwell_left + waveCfg.Dwell_right > 0) ? 2100 : 2000;
 
-	// ÖÜÆÚ³¤¶È
+	// å‘¨æœŸé•¿åº¦
 	float dist = vel * (1/freq + swingHoldTime/1000);
 
 	Eigen::Vector3f zDir(0, 0, 0);
-	// ×Ô¶¯¼ÆËãº¸Ç¹½Ç¶È
+	// è‡ªåŠ¨è®¡ç®—ç„Šæªè§’åº¦
 	if (toolDir.size() < 3) {
-		// ¶ÁÈ¡»º³å×îÖÕÎ»ÖÃ´¦µÄÅ·À­½Ç(deg)
+		// è¯»å–ç¼“å†²æœ€ç»ˆä½ç½®å¤„çš„æ¬§æ‹‰è§’(deg)
 		Eigen::Vector3f zEuler(0, 0, 0);
 		for (size_t i = 0; i < 3; ++i) {
-			ret = ZAux_Direct_GetEndMoveBuffer(handle_, tcpAngleAxisIdx_[i], &zEuler[i]);
+			ret = ZAux_Direct_GetEndMoveBuffer(handle_, tcpAngleAxisIdx[i], &zEuler[i]);
 			if (ret != 0)
 				return handle_zaux_error(ret);
 		}
@@ -978,34 +1078,34 @@ int32 ZauxRobot::swing_on(float vel, const Weave& waveCfg, const std::vector<flo
 		zDir[1] = cos(zEuler[0]) * sin(zEuler[2]) * sin(zEuler[1]) - cos(zEuler[2]) * sin(zEuler[0]);
 		zDir[2] = cos(zEuler[0]) * cos(zEuler[1]);
 	}
-	// ¸ø¶¨º¸Ç¹½Ç¶È
+	// ç»™å®šç„Šæªè§’åº¦
 	else {
 		zDir = Eigen::Vector3f(toolDir[0], toolDir[1], toolDir[2]);
 	}
 
-	// ÉèÖÃ°Ú½Ç
+	// è®¾ç½®æ‘†è§’
 	//if (toolDir.size() > 0) {
 	//	Eigen::Vector3f tanDir(toolDir[0], toolDir[1], toolDir[2]);
 	//	tanDir.normalize();
 	//	zDir = (Eigen::AngleAxisf(waveCfg.Angle_Ltype_top * M_PI / 180, tanDir) * zDir).eval();
 	//}
 
-	sprintf(cmdbuff, "VECTOR_BUFFERED2(%d)", swingAxisIdx_[0]);
+	sprintf(cmdbuff, "VECTOR_BUFFERED2(%d)", swingAxisIdx[0]);
 	float vectorBuffered2 = 0.0;
 	ret = ZAux_Direct_GetVariablef(handle_, cmdbuff, &vectorBuffered2);
 	if (ret != 0)
 		return handle_zaux_error(ret);
 
-	//Éú³ÉÃüÁî
+	//ç”Ÿæˆå‘½ä»¤
 	sprintf(cmdbuff, "BASE(%d,%d,%d)\nCONN_SWING(%d,%d,%f,%f,%f,%d,%d,%f,%f,%f)",
-		camAxisIdx_[0], camAxisIdx_[1], camAxisIdx_[2],
-		// mode, Ö÷Öá, Ê¸Á¿¾àÀë, ÖÜÆÚ³¤¶È, ×óÓÒ°Ú·ù, ¿ªÊ¼Table, ½áÊøTable
-		5, swingAxisIdx_[0], vectorBuffered2, dist, ampl, sinTableBeg, sinTableBeg + numInterp - 1,
+		camAxisIdx[0], camAxisIdx[1], camAxisIdx[2],
+		// mode, ä¸»è½´, çŸ¢é‡è·ç¦», å‘¨æœŸé•¿åº¦, å·¦å³æ‘†å¹…, å¼€å§‹Table, ç»“æŸTable
+		5, swingAxisIdx[0], vectorBuffered2, dist, ampl, sinTableBeg, sinTableBeg + numInterp - 1,
 		zDir[0], zDir[1], zDir[2]
 	);
 	//std::cout << cmdbuff  << std::endl;
 
-	//µ÷ÓÃÃüÁîÖ´ĞĞº¯Êı
+	//è°ƒç”¨å‘½ä»¤æ‰§è¡Œå‡½æ•°
 	ret = ZAux_DirectCommand(handle_, cmdbuff, cmdbuffAck, 2048);
 	return handle_zaux_error(ret);
 }
@@ -1014,20 +1114,20 @@ int32 ZauxRobot::swing_on(float vel, const Weave& waveCfg, const std::vector<flo
 int32 ZauxRobot::swing_off(float displacement) {
 	char  cmdbuff[2048], tempbuff[2048], cmdbuffAck[2048];
 
-	sprintf(cmdbuff, "VECTOR_BUFFERED2(%d)", swingAxisIdx_[0]);
+	sprintf(cmdbuff, "VECTOR_BUFFERED2(%d)", swingAxisIdx[0]);
 	float vectorBuffered2 = 0.0;
 	ZAux_Direct_GetVariablef(handle_, cmdbuff, &vectorBuffered2);
 	vectorBuffered2 += displacement;
 
-	//Éú³ÉÃüÁî
+	//ç”Ÿæˆå‘½ä»¤
 	sprintf(cmdbuff, "BASE(%d,%d,%d)\nCONN_SWING(%d,%d,%f)",
-		camAxisIdx_[0], camAxisIdx_[1], camAxisIdx_[2],
-		// mode, Ö÷Öá, Ê¸Á¿¾àÀë
-		-1, swingAxisIdx_[0], vectorBuffered2
+		camAxisIdx[0], camAxisIdx[1], camAxisIdx[2],
+		// mode, ä¸»è½´, çŸ¢é‡è·ç¦»
+		-1, swingAxisIdx[0], vectorBuffered2
 	);
 	//std::cout << cmdbuff << std::endl;
 
-	//µ÷ÓÃÃüÁîÖ´ĞĞº¯Êı
+	//è°ƒç”¨å‘½ä»¤æ‰§è¡Œå‡½æ•°
 	int ret = ZAux_DirectCommand(handle_, cmdbuff, cmdbuffAck, 2048);
 
 	return handle_zaux_error(ret);
@@ -1035,26 +1135,26 @@ int32 ZauxRobot::swing_off(float displacement) {
 
 
 int32 ZauxRobot::wlder_on(float current, float voltage) {
-	// ¿ªÆø
+	// å¼€æ°”
 	//ZAux_BusCmd_NodePdoWrite(handle_, 7, 0x2002, 2, 5, 1);
 
 	uint16_t dec = 0;
 	uint8_t low = 0, high = 0;
-	// ÉèÖÃµçÁ÷
+	// è®¾ç½®ç”µæµ
 	dec = std::floor(current * 65535 / 550);
 	low = dec & 0x00FF;
 	high = (dec >> 8) & 0x00FF;
 	ZAux_BusCmd_NodePdoWrite(handle_, 7, 0x2002, 5, 5, low);
 	ZAux_BusCmd_NodePdoWrite(handle_, 7, 0x2002, 6, 5, high);
 
-	// ÉèÖÃµçÑ¹
+	// è®¾ç½®ç”µå‹
 	dec = std::floor(voltage * 65535 / 60);
 	low = dec & 0x00FF;
 	high = (dec >> 8) & 0x00FF;
 	ZAux_BusCmd_NodePdoWrite(handle_, 7, 0x2002, 7, 5, low);
 	ZAux_BusCmd_NodePdoWrite(handle_, 7, 0x2002, 8, 5, high);
 
-	// º¸½ÓÄ£Ê½(Ö±Á÷Ò»Ôª) & ¿ªÊ¼º¸½Ó
+	// ç„Šæ¥æ¨¡å¼(ç›´æµä¸€å…ƒ) & å¼€å§‹ç„Šæ¥
 	ZAux_BusCmd_NodePdoWrite(handle_, 7, 0x2002, 1, 5, 7);
 
 	return 0;
@@ -1062,25 +1162,29 @@ int32 ZauxRobot::wlder_on(float current, float voltage) {
 
 
 int32 ZauxRobot::wlder_off() {
-	// ¹ØÆø
+	// å…³æ°”
 	//ZAux_BusCmd_NodePdoWrite(handle_, 7, 0x2002, 2, 5, 0);
 
-	// ½áÊøº¸½Ó
+	// ç»“æŸç„Šæ¥
 	ZAux_BusCmd_NodePdoWrite(handle_, 7, 0x2002, 1, 5, 6);
 	return 0;
 }
 
 
-int32 ZauxRobot::execute_discrete_trajectory_abs(DiscreteTrajectory<float>& discreteTrajectory) {
-	std::vector<int> axis = tcpPosAxisIdx_;
-	axis.insert(axis.end(), tcpAngleAxisIdx_.begin(), tcpAngleAxisIdx_.end());
-	axis.insert(axis.end(), appAxisIdx_.begin(), appAxisIdx_.end());
-
-	// ¹ì¼£µãÎ¬¶ÈÓëÇı¶¯ÖáÎ¬¶ÈµÄ½ÏĞ¡Öµ
+/* ******************************** ç‰¹æ®Šè¿åŠ¨æŒ‡ä»¤ *********************************
+* @brief è¿ç»­è½¨è¿¹è¿åŠ¨
+*/
+int32 ZauxRobot::execute_discrete_trajectory_abs(DiscreteTrajectory<float>& discreteTrajectory, bool replace) {
+	return execute_discrete_trajectory(discreteTrajectory, replace);
+}
+int32 ZauxRobot::execute_discrete_trajectory(DiscreteTrajectory<float>& discreteTrajectory, bool replace) {
+	std::vector<int> axis = replace ? excuteAxis : ikAxis;
+	// è½¨è¿¹ç‚¹ç»´åº¦ä¸é©±åŠ¨è½´ç»´åº¦çš„è¾ƒå°å€¼
 	size_t num = (std::min)(discreteTrajectory.nodePoint.begin()->size(), axis.size());
+	axis.assign(axis.begin(), axis.begin() + num);
 	int ret = 0;
 
-	// Ö»¼ÆËãTCPÎ»ÖÃËÙ¶È
+	// åªè®¡ç®—TCPä½ç½®é€Ÿåº¦
 	std::vector<float> interpVec(axis.size(), 0);
 	for (size_t i = 0; i < 3; ++i) {
 		interpVec[i] = 1;
@@ -1089,92 +1193,71 @@ int32 ZauxRobot::execute_discrete_trajectory_abs(DiscreteTrajectory<float>& disc
 	if (ret != 0)
 		return handle_zaux_error(ret);
 
-	auto nodePointIte = discreteTrajectory.nodePoint.begin();
-	auto midPointIte = discreteTrajectory.midPoint.begin();
-	auto infoIte = discreteTrajectory.trajInfo.begin();
-
 	float trajIdx = 0;
-	// ¹ì¼£¼ÆÊı¸´Î»
+	// è½¨è¿¹è®¡æ•°å¤ä½
 	ret = ZAux_Direct_MoveTable(handle_, axis[0], 1001, -1);
 	if (ret != 0)
 		return handle_zaux_error(ret);
-	while (infoIte != discreteTrajectory.trajInfo.end()) {
-		std::vector<float> endBuffer = *(nodePointIte++), relEndMove(axis.size(), 0);
 
-		// ¹ì¼£ËÙ¶È
-		float vel = (*infoIte)[7];
-		// ÉèÖÃËÙ¶È
+	discreteTrajectory.reset_iterator();
+	while (discreteTrajectory.next() == 0) {
+		auto prePoint = discreteTrajectory.get_preNodePoint();
+		auto curPoint = discreteTrajectory.get_nodePoint();
+		auto midPoint = discreteTrajectory.get_midPoint();
+		auto traj = discreteTrajectory.get_trajInfo();
+
+		// è½¨è¿¹é€Ÿåº¦
+		float vel = traj.speed;
+		// è®¾ç½®é€Ÿåº¦
 		ret = ZAux_Direct_SetForceSpeed(handle_, axis[0], vel);
-		if (ret != 0) 
+		if (ret != 0)
 			return handle_zaux_error(ret);
-		// ÉèÖÃÆ½»¬¶È
-		if ((*infoIte)[8] >= 0) {
-			ret = ZAux_Direct_SetZsmooth(handle_, axis[0], (*infoIte)[8]);
-			if (ret != 0) 
-				return handle_zaux_error(ret);
-		}
-
-		// Ô²»¡ÔË¶¯
-		if ((*infoIte)[3] > 0) {
-			ret = this->moveC(axis, endBuffer, *midPointIte, *nodePointIte);
+		// è®¾ç½®å¹³æ»‘åº¦
+		if (traj.smooth >= 0) {
+			ret = ZAux_Direct_SetZsmooth(handle_, axis[0], traj.smooth);
 			if (ret != 0)
 				return handle_zaux_error(ret);
 		}
-		// Ö±ÏßÔË¶¯
+
+		// å½“å‰è½¨è¿¹çš„ç›¸å¯¹è¿åŠ¨é‡
+		std::vector<float> relEndMove = discreteTrajectory.get_relative_distance();
+
+		// åœ†å¼§è¿åŠ¨
+		if (traj.isArc()) {
+			ret = this->moveC(axis, prePoint, midPoint, curPoint);
+			if (ret != 0)
+				return handle_zaux_error(ret);
+		}
+		// ç›´çº¿è¿åŠ¨
 		else {
-			// ÖÕµãµ½ÆğµãµÄÏà¶ÔÔË¶¯
-			for (size_t i = 0; i < num; ++i) {
-				relEndMove[i] = (*nodePointIte)[i] - endBuffer[i];
-			}
-
-			// Å·À­½Ç×ª»»µ½Ïà¶ÔÔË¶¯: beg -> mid -> end
-			Eigen::Vector3f begEuler = Eigen::Vector3f(endBuffer[3], endBuffer[4], endBuffer[5]);
-			Eigen::Vector3f endEuler = Eigen::Vector3f((*midPointIte)[3], (*midPointIte)[4], (*midPointIte)[5]);
-			Eigen::Vector3f relEuler = get_zyx_euler_distance(begEuler, endEuler);
-			begEuler = endEuler;
-			endEuler = Eigen::Vector3f((*nodePointIte)[3], (*nodePointIte)[4], (*nodePointIte)[5]);
-			relEuler += get_zyx_euler_distance(begEuler, endEuler);
-			for (size_t i = 0; i < 3; ++i) {
-				// Å·À­½ÇÏà¶ÔÖµ
-				relEndMove[3 + i] = relEuler[i];
-				// ÖÕµãÅ·À­½Ç×ª»»µ½ÓëÆğµãÍ¬²à
-				(*nodePointIte)[3 + i] = endEuler[i];
-			}
-
-
-			// Ïà¶ÔÔË¶¯
-			ret = this->moveL(axis, relEndMove);
+			// ç›¸å¯¹è¿åŠ¨
+			//ret = this->moveL(axis, prePoint, curPoint);
+			ret = this->move(axis, relEndMove);
 			if (ret != 0)
 				return handle_zaux_error(ret);
 		}
 
-		// ¹ì¼£Êı+1
+		// è½¨è¿¹æ•°+1
 		ret = ZAux_Direct_MoveTable(handle_, axis[0], 1001, trajIdx++);
 		if (ret != 0)
 			return handle_zaux_error(ret);
 
-		midPointIte++;
-		infoIte++;
 	}
 
 	return handle_zaux_error(ret);
 }
 
-int32 ZauxRobot::execute_discrete_trajectory(DiscreteTrajectory<float>& discreteTrajectory) {
-	return 0;
-}
-
 int32 ZauxRobot::swing_tri(DiscreteTrajectory<float>& discreteTrajectory, const Weave& waveCfg) {
-	std::vector<int> axis = swingAxisIdx_, camAxis = camAxisIdx_;
-	axis.insert(axis.end(), tcpAngleAxisIdx_.begin(), tcpAngleAxisIdx_.end());
-	axis.insert(axis.end(), appAxisIdx_.begin(), appAxisIdx_.end());
-	axis.insert(axis.end(), camAxisIdx_.begin(), camAxisIdx_.end());
+	//std::vector<int> axis = swingAxisIdx, camAxis = camAxisIdx;
+	//axis.insert(axis.end(), tcpAngleAxisIdx.begin(), tcpAngleAxisIdx.end());
+	//axis.insert(axis.end(), appAxisIdx.begin(), appAxisIdx.end());
+	//axis.insert(axis.end(), camAxisIdx.begin(), camAxisIdx.end());
 
-	// ¹ì¼£µãÎ¬¶ÈÓëÇı¶¯ÖáÎ¬¶ÈµÄ½ÏĞ¡Öµ
-	size_t num = (std::min)(discreteTrajectory.nodePoint.begin()->size(), axis.size());
-	int ret = 0;
-
-	// Ö»¼ÆËãTCPÎ»ÖÃËÙ¶È
+	// è½¨è¿¹ç‚¹ç»´åº¦ä¸é©±åŠ¨è½´ç»´åº¦çš„è¾ƒå°å€¼
+	//size_t num = (std::min)(discreteTrajectory.nodePoint.begin()->size(), axis.size());
+	//int ret = 0;
+	/*
+	// åªè®¡ç®—TCPä½ç½®é€Ÿåº¦
 	//for (size_t i = 0; i < axis.size(); ++i) {
 	//	ZAux_Direct_MovePara(handle_, axis[0], (char*)"INTERP_FACTOR", axis[i], i < 3);
 	//}
@@ -1185,26 +1268,26 @@ int32 ZauxRobot::swing_tri(DiscreteTrajectory<float>& discreteTrajectory, const 
 	ret = set_axis_param(axis, (char*)"INTERP_FACTOR", interpVec);
 	if (ret != 0)
 		return handle_zaux_error(ret);
-	// Í¹ÂÖÖáÇåÁã
+	// å‡¸è½®è½´æ¸…é›¶
 	for (size_t i = 0; i < camAxisIdx_.size(); ++i) {
 		ret = ZAux_Direct_MovePara(handle_, axis[0], (char*)"DPOS", camAxisIdx_[i], 0);
 		if (ret != 0)
 			return handle_zaux_error(ret);
 	}
 
-	// ¶ÁÈ¡Èı½Ç°ÚĞÎ×´: °Ú·ù¡¢Ç°½ø±ÈÀı¡¢ºóÍË±ÈÀı
+	// è¯»å–ä¸‰è§’æ‘†å½¢çŠ¶: æ‘†å¹…ã€å‰è¿›æ¯”ä¾‹ã€åé€€æ¯”ä¾‹
 	float triWidth = (waveCfg.LeftWidth + waveCfg.RightWidth) / 2, feedRatio = waveCfg.Length, backRatio =  waveCfg.Bias;
-	// °Úº¸²ÎÊı
+	// æ‘†ç„Šå‚æ•°
 	float swingVel = (waveCfg.LeftWidth + waveCfg.RightWidth) * waveCfg.Freq, rightAngle = waveCfg.Angle_Ltype_top, leftAngle = waveCfg.Angle_Ltype_btm;
-	// ¹ì¼£Ê±¼ä
+	// è½¨è¿¹æ—¶é—´
 	float timeUnit = 1 / (2 * waveCfg.Freq), feedTime = timeUnit * feedRatio, backTime = timeUnit * backRatio;
 
-	// °Ú¶¯¿ªÊ¼
+	// æ‘†åŠ¨å¼€å§‹
 	ret = ZAux_Direct_MoveTable(handle_, axis[0], 1000, 1);
 	if (ret != 0)
 		return handle_zaux_error(ret);
 
-	// ±éÀú¹ì¼£
+	// éå†è½¨è¿¹
 	auto nodePointIte = discreteTrajectory.nodePoint.begin();
 	auto midPointIte = discreteTrajectory.midPoint.begin();
 	auto infoIte = discreteTrajectory.trajInfo.begin();
@@ -1217,10 +1300,10 @@ int32 ZauxRobot::swing_tri(DiscreteTrajectory<float>& discreteTrajectory, const 
 		std::vector<float> endBuffer = *(nodePointIte++), relEndMove(axis.size(), 0);
 
 		for (size_t i = 0; i < num; ++i) {
-			// ÖÕµãµ½ÆğµãµÄÏà¶ÔÔË¶¯
+			// ç»ˆç‚¹åˆ°èµ·ç‚¹çš„ç›¸å¯¹è¿åŠ¨
 			relEndMove[i] = (*nodePointIte)[i] - endBuffer[i];
 		}
-		// Å·À­½Ç×ª»»µ½Ïà¶ÔÔË¶¯: beg -> mid -> end
+		// æ¬§æ‹‰è§’è½¬æ¢åˆ°ç›¸å¯¹è¿åŠ¨: beg -> mid -> end
 		Eigen::Vector3f begEuler = Eigen::Vector3f(endBuffer[3], endBuffer[4], endBuffer[5]);
 		Eigen::Vector3f endEuler = Eigen::Vector3f((*midPointIte)[3], (*midPointIte)[4], (*midPointIte)[5]);
 		Eigen::Vector3f relEuler = get_zyx_euler_distance(begEuler, endEuler);
@@ -1231,10 +1314,10 @@ int32 ZauxRobot::swing_tri(DiscreteTrajectory<float>& discreteTrajectory, const 
 			relEndMove[3 + i] = relEuler[i];
 		}
 
-		// º¸½ÓËÙ¶È
+		// ç„Šæ¥é€Ÿåº¦
 		float weldVel = (*infoIte)[7];
 
-		// Ô²»¡ÔË¶¯
+		// åœ†å¼§è¿åŠ¨
 		if ((*infoIte)[3] > 0) {
 			ret = ZAux_Direct_SetForceSpeed(handle_, axis[0], weldVel);
 			if (ret != 0)
@@ -1243,35 +1326,35 @@ int32 ZauxRobot::swing_tri(DiscreteTrajectory<float>& discreteTrajectory, const 
 			if (ret != 0)
 				return handle_zaux_error(ret);
 		}
-		// Ö±ÏßÔË¶¯
+		// ç›´çº¿è¿åŠ¨
 		else {
-			// ¹ì¼£¶ÎÆğµã´¦µÄÅ·À­½Ç(deg)
+			// è½¨è¿¹æ®µèµ·ç‚¹å¤„çš„æ¬§æ‹‰è§’(deg)
 			Eigen::Vector3f zEuler(endBuffer[3], endBuffer[4], endBuffer[5]);
 			zEuler *= M_PI / 180;
-			// »º³å×îÖÕÎ»ÖÃµÄ¹¤¾ß Z ·½Ïò
+			// ç¼“å†²æœ€ç»ˆä½ç½®çš„å·¥å…· Z æ–¹å‘
 			Eigen::Vector3f zDir(0,0,0);
 			zDir[0] = sin(zEuler[2]) * sin(zEuler[0]) + cos(zEuler[2]) * cos(zEuler[0]) * sin(zEuler[1]);
 			zDir[1] = cos(zEuler[0]) * sin(zEuler[2]) * sin(zEuler[1]) - cos(zEuler[2]) * sin(zEuler[0]);
 			zDir[2] = cos(zEuler[0]) * cos(zEuler[1]);
 
-			// Ö±Ïß·½Ïò
+			// ç›´çº¿æ–¹å‘
 			Eigen::Vector3f begTan((*infoIte)[0], (*infoIte)[1], (*infoIte)[2]);
-			// Èı½Ç°ÚÔË¶¯¾àÀë
+			// ä¸‰è§’æ‘†è¿åŠ¨è·ç¦»
 			float dist = std::fabs((*infoIte)[3]);
 
-			// ĞŞÕıµÄz·½Ïò
+			// ä¿®æ­£çš„zæ–¹å‘
 			Eigen::Vector3f begUprightDir = (begTan.cross(zDir).cross(begTan)).normalized();
-			// ×óÓÒ°Ú¶¯·½Ïò
+			// å·¦å³æ‘†åŠ¨æ–¹å‘
 			Eigen::Vector3f rightDir = Eigen::AngleAxisf(rightAngle*M_PI/180 - M_PI / 2, begTan) * begUprightDir;
 			Eigen::Vector3f leftDir = Eigen::AngleAxisf(leftAngle*M_PI / 180 + M_PI / 2, begTan) * begUprightDir;
-			// ÍêÕûµÄÈı½ÇĞÎÖÜÆÚ
+			// å®Œæ•´çš„ä¸‰è§’å½¢å‘¨æœŸ
 			size_t numPeriod = std::floor((dist / weldVel - feedTime) / (feedTime - backTime));
-			// ĞŞÕıº¸½ÓËÙ¶È
+			// ä¿®æ­£ç„Šæ¥é€Ÿåº¦
 			weldVel = dist / (numPeriod * (feedTime - backTime) + feedTime);
-			// Ç°½ø¾àÀë¡¢ºóÍË¾àÀë
+			// å‰è¿›è·ç¦»ã€åé€€è·ç¦»
 			float feedDist = weldVel * feedTime, backDist = weldVel * backTime;
 
-			// º¸½ÓËÙ¶È
+			// ç„Šæ¥é€Ÿåº¦
 			ret = ZAux_Direct_SetForceSpeed(handle_, axis[0], swingVel);
 			if (ret != 0)
 				return handle_zaux_error(ret);
@@ -1279,7 +1362,7 @@ int32 ZauxRobot::swing_tri(DiscreteTrajectory<float>& discreteTrajectory, const 
 			std::vector<float> moveCmd(axis.size(), 0);
 
 			for (size_t i = 0; i < numPeriod+1; ++i) {
-				// ÓÒ²àÏòÓÒ
+				// å³ä¾§å‘å³
 				for (size_t j = 0; j < moveCmd.size(); ++j) {
 					moveCmd[j] = j < 3 ? rightDir[j] * triWidth : 0;
 				}
@@ -1290,13 +1373,13 @@ int32 ZauxRobot::swing_tri(DiscreteTrajectory<float>& discreteTrajectory, const 
 				if (ret != 0)
 					return handle_zaux_error(ret);
 
-				// ÓÒ²àÏòÇ° + ×ËÌ¬
+				// å³ä¾§å‘å‰ + å§¿æ€
 				for (size_t j = 0; j < 3; ++j) {
 					moveCmd[j] = -rightDir[j] * triWidth;
 					moveCmd[moveCmd.size() - 3 + j] = begTan[j] * feedDist;
 					moveCmd[3 + j] = relEndMove[3 + j] / numPeriod;
 				}
-				// ¸½¼ÓÖáÔË¶¯
+				// é™„åŠ è½´è¿åŠ¨
 				for (size_t j = 6; j < moveCmd.size()-3; ++j) {
 					moveCmd[j] = relEndMove[j] / numPeriod;
 				}
@@ -1310,15 +1393,15 @@ int32 ZauxRobot::swing_tri(DiscreteTrajectory<float>& discreteTrajectory, const 
 				if (ret != 0)
 					return handle_zaux_error(ret);
 
-				// ×îºóÒ»¶ÎÍË³ö
+				// æœ€åä¸€æ®µé€€å‡º
 				if (i == numPeriod) break;
 
-				// ×ó²âÏòºó
+				// å·¦æµ‹å‘å
 				for (size_t j = 0; j < 3; ++j) {
 					moveCmd[j] = leftDir[j] * triWidth;
 					moveCmd[moveCmd.size() - 3 + j] = - begTan[j] * backDist;
 				}
-				// ¸½¼ÓÖáÔË¶¯ºÍ×ËÌ¬ÇåÁã
+				// é™„åŠ è½´è¿åŠ¨å’Œå§¿æ€æ¸…é›¶
 				for (size_t j = 3; j < moveCmd.size()-3; ++j) {
 					moveCmd[j] = 0;
 				}
@@ -1332,7 +1415,7 @@ int32 ZauxRobot::swing_tri(DiscreteTrajectory<float>& discreteTrajectory, const 
 				if (ret != 0)
 					return handle_zaux_error(ret);
 
-				// ×ó²àÏòÓÒ
+				// å·¦ä¾§å‘å³
 				for (size_t j = 0; j < moveCmd.size(); ++j) {
 					moveCmd[j] = j < 3 ? -leftDir[j] * triWidth : 0;
 				}
@@ -1345,7 +1428,7 @@ int32 ZauxRobot::swing_tri(DiscreteTrajectory<float>& discreteTrajectory, const 
 			}
 		}
 
-		// ¹ì¼£Êı+1
+		// è½¨è¿¹æ•°+1
 		ret = ZAux_Direct_MoveTable(handle_, axis[0], 1001, trajIdx++);
 		if (ret != 0)
 			return handle_zaux_error(ret);
@@ -1354,22 +1437,24 @@ int32 ZauxRobot::swing_tri(DiscreteTrajectory<float>& discreteTrajectory, const 
 		infoIte++;
 	}
 
-	// °Ú¶¯Í£Ö¹
+	// æ‘†åŠ¨åœæ­¢
 	ret = ZAux_Direct_MoveTable(handle_, axis[0], 1000, -1);
 	if (ret != 0)
 		return handle_zaux_error(ret);
-	return handle_zaux_error(ret);
+	*/
+	return 0;
 }
 int32 ZauxRobot::swing_sin(DiscreteTrajectory<float>& discreteTrajectory, const Weave& waveCfg) {
-	std::vector<int> axis = swingAxisIdx_;
-	axis.insert(axis.end(), tcpAngleAxisIdx_.begin(), tcpAngleAxisIdx_.end());
-	axis.insert(axis.end(), appAxisIdx_.begin(), appAxisIdx_.end());
+	//std::vector<int> axis = swingAxisIdx_;
+	//axis.insert(axis.end(), tcpAngleAxisIdx_.begin(), tcpAngleAxisIdx_.end());
+	//axis.insert(axis.end(), appAxisIdx_.begin(), appAxisIdx_.end());
+	std::vector<int> axis = ikAxis;
 
-	// ¹ì¼£µãÎ¬¶ÈÓëÇı¶¯ÖáÎ¬¶ÈµÄ½ÏĞ¡Öµ
+	// è½¨è¿¹ç‚¹ç»´åº¦ä¸é©±åŠ¨è½´ç»´åº¦çš„è¾ƒå°å€¼
 	size_t num = (std::min)(discreteTrajectory.nodePoint.begin()->size(), axis.size());
 	int ret = 0;
-
-	// Ö»¼ÆËãTCPÎ»ÖÃËÙ¶È
+	/*
+	// åªè®¡ç®—TCPä½ç½®é€Ÿåº¦
 	std::vector<float> interpVec(axis.size(), 0);
 	for (size_t i = 0; i < 3; ++i) {
 		interpVec[i] = 1;
@@ -1377,22 +1462,22 @@ int32 ZauxRobot::swing_sin(DiscreteTrajectory<float>& discreteTrajectory, const 
 	ret = set_axis_param(axis, (char*)"INTERP_FACTOR", interpVec);
 	if (ret != 0)
 		return handle_zaux_error(ret);
-	// Í¹ÂÖÖáÇåÁã
+	// å‡¸è½®è½´æ¸…é›¶
 	for (size_t i = 0; i < camAxisIdx_.size(); ++i) {
 		ret = ZAux_Direct_MovePara(handle_, axis[0], (char*)"DPOS", camAxisIdx_[i], 0);
 		if (ret != 0)
 			return handle_zaux_error(ret);
 	}
-	// ÉèÖÃ°Úº¸²ÎÊı
+	// è®¾ç½®æ‘†ç„Šå‚æ•°
 	ret = update_swing_table(waveCfg);
 	if (ret != 0)
 		return handle_zaux_error(ret);
-	// °Ú¶¯¿ªÊ¼
+	// æ‘†åŠ¨å¼€å§‹
 	ret = ZAux_Direct_MoveTable(handle_, axis[0], 1000, 1);
 	if (ret != 0)
 		return handle_zaux_error(ret);
 
-	// ±éÀú¹ì¼£
+	// éå†è½¨è¿¹
 	auto nodePointIte = discreteTrajectory.nodePoint.begin();
 	auto midPointIte = discreteTrajectory.midPoint.begin();
 	auto infoIte = discreteTrajectory.trajInfo.begin();
@@ -1406,12 +1491,12 @@ int32 ZauxRobot::swing_sin(DiscreteTrajectory<float>& discreteTrajectory, const 
 		std::vector<float> endBuffer = *(nodePointIte++);
 
 		std::vector<float> relEndMove(axis.size(), 0);
-		// ÖÕµãµ½ÆğµãµÄÏà¶ÔÔË¶¯
+		// ç»ˆç‚¹åˆ°èµ·ç‚¹çš„ç›¸å¯¹è¿åŠ¨
 		for (size_t i = 0; i < num; ++i) {
 			relEndMove[i] = (*nodePointIte)[i] - endBuffer[i];
 		}
 
-		// Å·À­½Ç×ª»»µ½Ïà¶ÔÔË¶¯: beg -> mid -> end
+		// æ¬§æ‹‰è§’è½¬æ¢åˆ°ç›¸å¯¹è¿åŠ¨: beg -> mid -> end
 		Eigen::Vector3f begEuler = Eigen::Vector3f(endBuffer[3], endBuffer[4], endBuffer[5]);
 		Eigen::Vector3f endEuler = Eigen::Vector3f((*midPointIte)[3], (*midPointIte)[4], (*midPointIte)[5]);
 		Eigen::Vector3f relEuler = get_zyx_euler_distance(begEuler, endEuler);
@@ -1419,65 +1504,44 @@ int32 ZauxRobot::swing_sin(DiscreteTrajectory<float>& discreteTrajectory, const 
 		endEuler = Eigen::Vector3f((*nodePointIte)[3], (*nodePointIte)[4], (*nodePointIte)[5]);
 		relEuler += get_zyx_euler_distance(begEuler, endEuler);
 		for (size_t i = 0; i < 3; ++i) {
-			// Å·À­½ÇÏà¶ÔÖµ
+			// æ¬§æ‹‰è§’ç›¸å¯¹å€¼
 			relEndMove[3 + i] = relEuler[i];
-			// ÖÕµãÅ·À­½Ç×ª»»µ½ÓëÆğµãÍ¬²à
+			// ç»ˆç‚¹æ¬§æ‹‰è§’è½¬æ¢åˆ°ä¸èµ·ç‚¹åŒä¾§
 			(*nodePointIte)[3 + i] = endEuler[i];
 		}
 		begEuler = endEuler;
 
-		// ¹ì¼£ËÙ¶È
+		// è½¨è¿¹é€Ÿåº¦
 		float vel = (*infoIte)[7];
-		// ÉèÖÃËÙ¶È
+		// è®¾ç½®é€Ÿåº¦
 		ret = ZAux_Direct_SetForceSpeed(handle_, axis[0], vel);
 		if (ret != 0)
 			return handle_zaux_error(ret);
-		// ÉèÖÃÆ½»¬¶È
+		// è®¾ç½®å¹³æ»‘åº¦
 		if ((*infoIte)[8] >= 0) {
 			ret = ZAux_Direct_SetZsmooth(handle_, axis[0], (*infoIte)[8]);
 			if (ret != 0)
 				return handle_zaux_error(ret);
 		}
 
-		// ÉèÖÃ°Ú¶¯²ÎÊı
-		//if (waveCfg.Angle_Ltype_top != 0) {
-		//	Eigen::Vector3f tanDir(0, 0, 0);
-		//	if ((*infoIte)[3] > 0) {
-		//		Eigen::Vector3f radiusDir(endBuffer[0] - (*infoIte)[0], endBuffer[1] - (*infoIte)[1], endBuffer[2] - (*infoIte)[2]);
-		//		Eigen::Vector3f normDir((*infoIte)[4], (*infoIte)[5], (*infoIte)[6]);
-		//		tanDir = normDir.cross(radiusDir).normalized();
-		//	}
-		//	else {
-		//		tanDir = Eigen::Vector3f((*infoIte)[0], (*infoIte)[1], (*infoIte)[2]);
-		//	}
-		//	ret = swing_on(vel, waveCfg, { tanDir[0], tanDir[1], tanDir[2] });
-		//	if (ret != 0)
-		//		return handle_zaux_error(ret);
-		//}
-		//else {
-		//	ret = swing_on(vel, waveCfg);
-		//	if (ret != 0)
-		//		return handle_zaux_error(ret);
-		//}
-
 		int numPeriod = std::round(std::fabs((*infoIte)[3]) / (vel / waveCfg.Freq));
-		// Ğ¡ÓÚ1¸öÖÜÆÚÔò×ß²»°Ú¶¯
+		// å°äº1ä¸ªå‘¨æœŸåˆ™èµ°ä¸æ‘†åŠ¨
 		if (numPeriod > 0) {
 			ret = swing_on(vel, waveCfg);
 			if (ret != 0)
 				return handle_zaux_error(ret);
 
-			// ¼ÆËãÖáÔË¶¯¾àÀë
+			// è®¡ç®—è½´è¿åŠ¨è·ç¦»
 			ret = swing_off(std::fabs((*infoIte)[3]));
 			if (ret != 0)
 				return handle_zaux_error(ret);
 		}
 
-		// Ô²»¡ÔË¶¯
+		// åœ†å¼§è¿åŠ¨
 		if ((*infoIte)[3] > 0) {
-			// »úÆ÷ÈËÍ£Ö¹
+			// æœºå™¨äººåœæ­¢
 			if (waveCfg.Dwell_type > 0 && (waveCfg.Dwell_left + waveCfg.Dwell_right) > 0 && numPeriod > 0) {
-				// ¼ÆËãµãÎ»ÖÃ
+				// è®¡ç®—ç‚¹ä½ç½®
 				Eigen::Vector3f tempPos, rotNorm((*infoIte)[4], (*infoIte)[5], (*infoIte)[6]);
 				Eigen::Vector3f radiusDir(0, 0, 0), centerPos((*infoIte)[0], (*infoIte)[1], (*infoIte)[2]);
 
@@ -1490,7 +1554,7 @@ int32 ZauxRobot::swing_sin(DiscreteTrajectory<float>& discreteTrajectory, const 
 				float partial = 0, theta = rotNorm.norm();
 				rotNorm.normalize();
 
-				// 1/4 ÖÜÆÚ
+				// 1/4 å‘¨æœŸ
 				partial += 1.0 / (4 * numPeriod);
 				tempPos = Eigen::AngleAxisf(partial * theta, rotNorm) * radiusDir + centerPos;
 				for (size_t i = 0; i < num; ++i) {
@@ -1506,7 +1570,7 @@ int32 ZauxRobot::swing_sin(DiscreteTrajectory<float>& discreteTrajectory, const 
 						return handle_zaux_error(ret);
 				}
 
-				// 1/2 * 2ÖÜÆÚ
+				// 1/2 * 2å‘¨æœŸ
 				for (size_t i = 0; i < numPeriod; ++i) {
 					partial += 1.0 / (2 * numPeriod);
 					tempPos = Eigen::AngleAxisf(partial * theta, rotNorm) * radiusDir + centerPos;
@@ -1523,7 +1587,7 @@ int32 ZauxRobot::swing_sin(DiscreteTrajectory<float>& discreteTrajectory, const 
 							return handle_zaux_error(ret);
 
 					}
-					// ×îºóÒ»¸öÖÜÆÚÍË³ö
+					// æœ€åä¸€ä¸ªå‘¨æœŸé€€å‡º
 					if (i +1 == numPeriod) break;
 
 					partial += 1.0 / (2 * numPeriod);
@@ -1543,7 +1607,7 @@ int32 ZauxRobot::swing_sin(DiscreteTrajectory<float>& discreteTrajectory, const 
 					}
 				}
 
-				// 1/4 ÖÜÆÚ
+				// 1/4 å‘¨æœŸ
 				partial += 1.0 / (4 * numPeriod);
 				tempPos = Eigen::AngleAxisf(partial * theta, rotNorm) * radiusDir + centerPos;
 				for (size_t i = 0; i < num; ++i) {
@@ -1554,20 +1618,20 @@ int32 ZauxRobot::swing_sin(DiscreteTrajectory<float>& discreteTrajectory, const 
 					return handle_zaux_error(ret);
 				tempBegPoint = tempEndPoint;
 			}
-			// °Ú¶¯Í£Ö¹
+			// æ‘†åŠ¨åœæ­¢
 			else {
 				ret = this->moveC(axis, endBuffer, *midPointIte, *nodePointIte);
 				if (ret != 0)
 					return handle_zaux_error(ret);
 			}
 		}
-		// Ö±ÏßÔË¶¯
+		// ç›´çº¿è¿åŠ¨
 		else {
-			// »úÆ÷ÈËÍ£Ö¹
+			// æœºå™¨äººåœæ­¢
 			if (waveCfg.Dwell_type > 0 && (waveCfg.Dwell_left + waveCfg.Dwell_right) > 0 && numPeriod > 0) {
 				std::vector<float> detRelEndMove(relEndMove.size(), 0);
 
-				// 1/4 ÖÜÆÚÔË¶¯Á¿
+				// 1/4 å‘¨æœŸè¿åŠ¨é‡
 				for (size_t j = 0; j < relEndMove.size(); ++j)
 					detRelEndMove[j] = relEndMove[j] / (numPeriod * 4);
 				ret = this->moveL(axis, detRelEndMove);
@@ -1579,7 +1643,7 @@ int32 ZauxRobot::swing_sin(DiscreteTrajectory<float>& discreteTrajectory, const 
 						return handle_zaux_error(ret);
 				}
 
-				// 1/2 ÖÜÆÚÔË¶¯Á¿
+				// 1/2 å‘¨æœŸè¿åŠ¨é‡
 				for (size_t j = 0; j < relEndMove.size(); ++j)
 					detRelEndMove[j] *= 2;
 				for (int i = 0; i < numPeriod; ++i) {
@@ -1591,7 +1655,7 @@ int32 ZauxRobot::swing_sin(DiscreteTrajectory<float>& discreteTrajectory, const 
 						if (ret != 0)
 							return handle_zaux_error(ret);
 					}
-					// ×îºóÒ»¸öÖÜÆÚÍË³ö
+					// æœ€åä¸€ä¸ªå‘¨æœŸé€€å‡º
 					if (i+1 == numPeriod) break;
 
 					ret = this->moveL(axis, detRelEndMove);
@@ -1603,23 +1667,23 @@ int32 ZauxRobot::swing_sin(DiscreteTrajectory<float>& discreteTrajectory, const 
 							return handle_zaux_error(ret);
 					}
 				}
-				// 1/4 ÖÜÆÚÔË¶¯Á¿
+				// 1/4 å‘¨æœŸè¿åŠ¨é‡
 				for (size_t j = 0; j < relEndMove.size(); ++j)
 					detRelEndMove[j] /= 2;
 				ret = this->moveL(axis, detRelEndMove);
 				if (ret != 0)
 					return handle_zaux_error(ret);
 			}
-			// °Ú¶¯Í£Ö¹
+			// æ‘†åŠ¨åœæ­¢
 			else {
-				// Ïà¶ÔÔË¶¯
+				// ç›¸å¯¹è¿åŠ¨
 				ret = this->moveL(axis, relEndMove);
 				if (ret != 0)
 					return handle_zaux_error(ret);
 			}
 		}
 
-		// ¹ì¼£Êı+1
+		// è½¨è¿¹æ•°+1
 		ret = ZAux_Direct_MoveTable(handle_, axis[0], 1001, trajIdx++);
 		if (ret != 0)
 			return handle_zaux_error(ret);
@@ -1628,10 +1692,11 @@ int32 ZauxRobot::swing_sin(DiscreteTrajectory<float>& discreteTrajectory, const 
 		infoIte++;
 	}
 
-	// °Ú¶¯Í£Ö¹
+	// æ‘†åŠ¨åœæ­¢
 	ret = ZAux_Direct_MoveTable(handle_, axis[0], 1000, -1);
 	if (ret != 0)
 		return handle_zaux_error(ret);
+	*/
 	return 0;
 }
 
@@ -1655,16 +1720,14 @@ int32 ZauxRobot::swing_trajectory(DiscreteTrajectory<float>& discreteTrajectory,
 }
 
 
+// è¿ç»­è½¨è¿¹æ‘†ç„Š
 int32 ZauxRobot::swing_trajectory(DiscreteTrajectory<float>& discreteTrajectory) {
-	std::vector<int> axis = swingAxisIdx_;
-	axis.insert(axis.end(), tcpAngleAxisIdx_.begin(), tcpAngleAxisIdx_.end());
-	axis.insert(axis.end(), appAxisIdx_.begin(), appAxisIdx_.end());
-
-	// ¹ì¼£µãÎ¬¶ÈÓëÇı¶¯ÖáÎ¬¶ÈµÄ½ÏĞ¡Öµ
-	size_t num = (std::min)(discreteTrajectory.nodePoint.begin()->size(), axis.size());
+	// è½¨è¿¹ç‚¹ç»´åº¦ä¸é©±åŠ¨è½´ç»´åº¦çš„è¾ƒå°å€¼
+	size_t num = (std::min)(discreteTrajectory.nodePoint.begin()->size(), swingAxis.size());
+	std::vector<int> axis(swingAxis.begin(), swingAxis.begin() + num);
 	int ret = 0;
-
-	// Ö»¼ÆËãTCPÎ»ÖÃËÙ¶È
+	
+	// åªè®¡ç®—TCPä½ç½®é€Ÿåº¦
 	std::vector<float> interpVec(axis.size(), 0);
 	for (size_t i = 0; i < 3; ++i) {
 		interpVec[i] = 1;
@@ -1672,111 +1735,85 @@ int32 ZauxRobot::swing_trajectory(DiscreteTrajectory<float>& discreteTrajectory)
 	ret = set_axis_param(axis, (char*)"INTERP_FACTOR", interpVec);
 	if (ret != 0)
 		return handle_zaux_error(ret);
-	// Í¹ÂÖÖáÇåÁã
-	for (size_t i = 0; i < camAxisIdx_.size(); ++i) {
-		ret = ZAux_Direct_MovePara(handle_, axis[0], (char*)"DPOS", camAxisIdx_[i], 0);
+	// å‡¸è½®è½´æ¸…é›¶
+	for (size_t i = 0; i < camAxisIdx.size(); ++i) {
+		ret = ZAux_Direct_MovePara(handle_, axis[0], (char*)"DPOS", camAxisIdx[i], 0);
 		if (ret != 0)
 			return handle_zaux_error(ret);
 	}
-	// °Ú¶¯¿ªÊ¼
+	// æ‘†åŠ¨å¼€å§‹
 	ret = ZAux_Direct_MoveTable(handle_, axis[0], 1000, 1);
 	if (ret != 0)
 		return handle_zaux_error(ret);
 
-	// ±éÀú¹ì¼£
-	auto nodePointIte = discreteTrajectory.nodePoint.begin();
-	auto midPointIte = discreteTrajectory.midPoint.begin();
-	auto infoIte = discreteTrajectory.trajInfo.begin();
-	// ¹¤ÒÕ²ÎÊı
-	auto waveCfg = discreteTrajectory.waveInfo.begin();
-	auto trackCfg = discreteTrajectory.trackInfo.begin();
-	auto weldCfg = discreteTrajectory.weldInfo.begin();
-
+	
 	float trajIdx = -1;
 	ret = ZAux_Direct_MoveTable(handle_, axis[0], 1001, trajIdx++);
 	if (ret != 0)
 		return handle_zaux_error(ret);
-	Eigen::Vector3f begEuler((*nodePointIte)[3], (*nodePointIte)[4], (*nodePointIte)[5]), endEuler = begEuler;
-	while (infoIte != discreteTrajectory.trajInfo.end()) {
-		auto curPoint = *nodePointIte++;
 
-		// ¹¹½¨µ±Ç°¹ì¼£ĞÅÏ¢
+	discreteTrajectory.reset_iterator();
+	while (discreteTrajectory.next() == 0) {
+		auto prePoint = discreteTrajectory.get_preNodePoint();
+		auto curPoint = discreteTrajectory.get_nodePoint();
+		auto midPoint = discreteTrajectory.get_midPoint();
+		auto traj = discreteTrajectory.get_trajInfo();
+
+		// è½¨è¿¹é€Ÿåº¦
+		float vel = traj.speed;
+		if (ret != 0)
+			return handle_zaux_error(ret);
+
+		// è¯»å–ç„Šæ¥å‚æ•°
+		Weave waveCfg;
+		Arc_WeldingParaItem weldCfg;
+		Track trackCfg;
+		read_weld_param(traj.appendix, waveCfg, weldCfg, trackCfg);
+
+		// æ„å»ºå½“å‰è½¨è¿¹ä¿¡æ¯
 		DiscreteTrajectory<float> curTraj;
-		curTraj.set_starting_point(curPoint);
-		// Ô²»¡¹ì¼£
-		if ((*infoIte)[3] > 0) {
-			curTraj.add_arc(*nodePointIte, *midPointIte, weldCfg->WeldingSpeed);
+		curTraj.set_starting_point(prePoint);
+		// åœ†å¼§è½¨è¿¹
+		if (traj.isArc()) {
+			curTraj.add_arc(curPoint, midPoint, traj);
 		}
 		else {
-			curTraj.add_line(*nodePointIte, weldCfg->WeldingSpeed);
+			curTraj.add_line(curPoint, traj);
 		}
 
-		// ¹ì¼£ËÙ¶È
-		float vel = (*infoIte)[7];
-		if (ret != 0)
-			return handle_zaux_error(ret);
-		// ĞŞ¸Äº¸½Ó²ÎÊı
-		//update_welder_config(*weldCfg);
-		// ĞŞ¸Ä¸ú×Ù²ÎÊı
-		//update_track_config(*trackCfg);
+		// ä¿®æ”¹ç„Šæ¥å‚æ•°
+		//update_welder_config(weldCfg);
+		// ä¿®æ”¹è·Ÿè¸ªå‚æ•°
+		//update_track_config(trackCfg);
 
-		// ÉèÖÃ°Ú¶¯²ÎÊı
-		ret = update_swing_table(*waveCfg);
-		if (ret != 0)
-			return handle_zaux_error(ret);
-		int numPeriod = std::round(std::fabs((*infoIte)[3]) / (vel / waveCfg->Freq));
-		// Ğ¡ÓÚ1¸öÖÜÆÚÔò²»°Ú¶¯
-		if (numPeriod > 0) {
-			// ¼ÆËã°Úº¸·½Ïò
-			std::vector<float> zDir(3), zEuler = { static_cast<float>(curPoint[3] * M_PI / 180),
-				static_cast<float>(curPoint[4] * M_PI / 180),
-				static_cast<float>(curPoint[5] * M_PI / 180) };
-
-			zDir[0] = sin(zEuler[2]) * sin(zEuler[0]) + cos(zEuler[2]) * cos(zEuler[0]) * sin(zEuler[1]);
-			zDir[1] = cos(zEuler[0]) * sin(zEuler[2]) * sin(zEuler[1]) - cos(zEuler[2]) * sin(zEuler[0]);
-			zDir[2] = cos(zEuler[0]) * cos(zEuler[1]);
-
-			ret = swing_on(vel, *waveCfg, zDir);
-			if (ret != 0)
-				return handle_zaux_error(ret);
-
-			// ¼ÆËãÖáÔË¶¯¾àÀë
-			ret = swing_off(std::fabs((*infoIte)[3]));
+		// è®¾ç½®å¹³æ»‘åº¦
+		if (traj.smooth >= 0) {
+			ret = ZAux_Direct_SetZsmooth(handle_, axis[0], traj.smooth);
 			if (ret != 0)
 				return handle_zaux_error(ret);
 		}
-
-		// ÉèÖÃÆ½»¬¶È
-		if ((*infoIte)[8] >= 0) {
-			ret = ZAux_Direct_SetZsmooth(handle_, axis[0], (*infoIte)[8]);
-			if (ret != 0)
-				return handle_zaux_error(ret);
-		}
-		// ÉèÖÃËÙ¶È
+		// è®¾ç½®é€Ÿåº¦
 		ret = ZAux_Direct_SetForceSpeed(handle_, axis[0], vel);
 
-		// ¿ªÊ¼°Úº¸
-		if (waveCfg->Shape == 0) {
-			swing_single_sin(curTraj, *waveCfg);
+		// ä¸æ‘†åŠ¨
+		if (waveCfg.Id == 0) {
+			swing_single_empty(curTraj);
 		}
-		else if (waveCfg->Shape == 3) {
-			swing_single_tri(curTraj, *waveCfg);
+		// å¼€å§‹æ‘†ç„Š
+		else if (waveCfg.Shape == 0) {
+			swing_single_sin(curTraj, waveCfg);
+		}
+		else if (waveCfg.Shape == 3) {
+			swing_single_tri(curTraj, waveCfg);
 		}
 		else {
 
 		}
-		// ¹ì¼£¼ÆÊı+1
+		// è½¨è¿¹è®¡æ•°+1
 		ret = ZAux_Direct_MoveTable(handle_, axis[0], 1001, trajIdx++);
-
-		midPointIte++;
-		infoIte++;
-		// 
-		waveCfg++;
-		trackCfg++;
-		weldCfg++;
 	}
 
-	// °Ú¶¯Í£Ö¹
+	// æ‘†åŠ¨åœæ­¢
 	ret = ZAux_Direct_MoveTable(handle_, axis[0], 1000, -1);
 	if (ret != 0)
 		return handle_zaux_error(ret);
@@ -1785,72 +1822,109 @@ int32 ZauxRobot::swing_trajectory(DiscreteTrajectory<float>& discreteTrajectory)
 }
 
 int32 ZauxRobot::swing_single_sin(DiscreteTrajectory<float>& discreteTrajectory, const Weave& waveCfg) {
-	std::vector<int> axis = swingAxisIdx_;
-	axis.insert(axis.end(), tcpAngleAxisIdx_.begin(), tcpAngleAxisIdx_.end());
-	axis.insert(axis.end(), appAxisIdx_.begin(), appAxisIdx_.end());
-
-	// ¹ì¼£µãÎ¬¶ÈÓëÇı¶¯ÖáÎ¬¶ÈµÄ½ÏĞ¡Öµ
-	size_t num = (std::min)(discreteTrajectory.nodePoint.begin()->size(), axis.size());
+	// è½¨è¿¹ç‚¹ç»´åº¦ä¸é©±åŠ¨è½´ç»´åº¦çš„è¾ƒå°å€¼
+	size_t num = (std::min)(discreteTrajectory.nodePoint.begin()->size(), swingAxis.size());
+	std::vector<int> axis(swingAxis.begin(), swingAxis.begin() + num);
 	int ret = 0;
 
-	// ±éÀú¹ì¼£
-	auto nodePointIte = discreteTrajectory.nodePoint.begin();
-	auto midPointIte = discreteTrajectory.midPoint.begin();
-	auto infoIte = discreteTrajectory.trajInfo.begin();
+	discreteTrajectory.reset_iterator();
+	if (discreteTrajectory.next() != 0) {
+		return 1;
+	}
 
-	Eigen::Vector3f begEuler((*nodePointIte)[3], (*nodePointIte)[4], (*nodePointIte)[5]), endEuler = begEuler;
-	while (infoIte != discreteTrajectory.trajInfo.end()) {
-		std::vector<float> endBuffer = *(nodePointIte++);
+	auto prePoint = discreteTrajectory.get_preNodePoint();
+	auto curPoint = discreteTrajectory.get_nodePoint();
+	auto midPoint = discreteTrajectory.get_midPoint();
+	auto traj = discreteTrajectory.get_trajInfo();
 
-		std::vector<float> relEndMove(axis.size(), 0);
-		// ÖÕµãµ½ÆğµãµÄÏà¶ÔÔË¶¯
-		for (size_t i = 0; i < num; ++i) {
-			relEndMove[i] = (*nodePointIte)[i] - endBuffer[i];
-		}
+	// è®¾ç½®æ‘†åŠ¨å‚æ•°
+	ret = update_swing_table(waveCfg);
+	if (ret != 0)
+		return handle_zaux_error(ret);
+	// å°äº1ä¸ªå‘¨æœŸåˆ™ä¸æ‘†åŠ¨
+	int numPeriod = std::round(traj.get_dist() / (traj.speed / waveCfg.Freq));
+	if (numPeriod > 0) {
+		// è®¡ç®—æ‘†ç„Šæ–¹å‘
+		std::vector<float> zDir(3), zEuler = { static_cast<float>(prePoint[3] * M_PI / 180),
+			static_cast<float>(prePoint[4] * M_PI / 180),
+			static_cast<float>(prePoint[5] * M_PI / 180) };
 
-		// Å·À­½Ç×ª»»µ½Ïà¶ÔÔË¶¯: beg -> mid -> end
-		Eigen::Vector3f begEuler = Eigen::Vector3f(endBuffer[3], endBuffer[4], endBuffer[5]);
-		Eigen::Vector3f endEuler = Eigen::Vector3f((*midPointIte)[3], (*midPointIte)[4], (*midPointIte)[5]);
-		Eigen::Vector3f relEuler = get_zyx_euler_distance(begEuler, endEuler);
-		begEuler = endEuler;
-		endEuler = Eigen::Vector3f((*nodePointIte)[3], (*nodePointIte)[4], (*nodePointIte)[5]);
-		relEuler += get_zyx_euler_distance(begEuler, endEuler);
-		for (size_t i = 0; i < 3; ++i) {
-			// Å·À­½ÇÏà¶ÔÖµ
-			relEndMove[3 + i] = relEuler[i];
-			// ÖÕµãÅ·À­½Ç×ª»»µ½ÓëÆğµãÍ¬²à
-			(*nodePointIte)[3 + i] = endEuler[i];
-		}
-		begEuler = endEuler;
+		zDir[0] = sin(zEuler[2]) * sin(zEuler[0]) + cos(zEuler[2]) * cos(zEuler[0]) * sin(zEuler[1]);
+		zDir[1] = cos(zEuler[0]) * sin(zEuler[2]) * sin(zEuler[1]) - cos(zEuler[2]) * sin(zEuler[0]);
+		zDir[2] = cos(zEuler[0]) * cos(zEuler[1]);
 
-		// ¹ì¼£ËÙ¶È
-		float vel = (*infoIte)[7];
+		ret = swing_on(traj.speed, waveCfg, zDir);
+		if (ret != 0)
+			return handle_zaux_error(ret);
 
-		// ÉèÖÃ°Ú¶¯²ÎÊı
-		int numPeriod = std::round(std::fabs((*infoIte)[3]) / (vel / waveCfg.Freq));
+		// è®¡ç®—è½´è¿åŠ¨è·ç¦»
+		ret = swing_off(traj.get_dist());
+		if (ret != 0)
+			return handle_zaux_error(ret);
+	}
 
-		// Ô²»¡ÔË¶¯
-		if ((*infoIte)[3] > 0) {
-			// »úÆ÷ÈËÍ£Ö¹
-			if (waveCfg.Dwell_type > 0 && (waveCfg.Dwell_left + waveCfg.Dwell_right) > 0 && numPeriod > 0) {
-				// ¼ÆËãµãÎ»ÖÃ
-				Eigen::Vector3f tempPos, rotNorm((*infoIte)[4], (*infoIte)[5], (*infoIte)[6]);
-				Eigen::Vector3f radiusDir(0, 0, 0), centerPos((*infoIte)[0], (*infoIte)[1], (*infoIte)[2]);
+	// å½“å‰è½¨è¿¹çš„ç›¸å¯¹è¿åŠ¨é‡
+	std::vector<float> relEndMove = discreteTrajectory.get_relative_distance();
 
-				std::vector<float> tempBegPoint = endBuffer, tempEndPoint(endBuffer.size(), 0), tempCenPoint(endBuffer.size(), 0);
+	// åœ†å¼§è¿åŠ¨
+	if (traj.isArc()) {
+		// æœºå™¨äººåœæ­¢
+		if (waveCfg.Dwell_type > 0 && (waveCfg.Dwell_left + waveCfg.Dwell_right) > 0 && numPeriod > 0) {
+			std::vector<float> cent = traj.get_knot(), rotDir = traj.get_dir();
+			// è®¡ç®—ç‚¹ä½ç½®
+			Eigen::Vector3f tempPos, rotNorm(rotDir[0], rotDir[1], rotDir[2]);
+			Eigen::Vector3f radiusDir(0, 0, 0), centerPos(cent[0], cent[1], cent[2]);
 
-				for (size_t i = 0; i < 3; ++i) {
-					tempCenPoint[i] = centerPos[i];
-					radiusDir[i] = endBuffer[i] - centerPos[i];
-				}
-				float partial = 0, theta = rotNorm.norm();
-				rotNorm.normalize();
+			std::vector<float> tempBegPoint = prePoint, tempEndPoint(prePoint.size(), 0), tempCenPoint(prePoint.size(), 0);
 
-				// 1/4 ÖÜÆÚ
-				partial += 1.0 / (4 * numPeriod);
+			for (size_t i = 0; i < 3; ++i) {
+				tempCenPoint[i] = centerPos[i];
+				radiusDir[i] = prePoint[i] - centerPos[i];
+			}
+			float partial = 0, theta = rotNorm.norm();
+			rotNorm.normalize();
+
+			// 1/4 å‘¨æœŸ
+			partial += 1.0 / (4 * numPeriod);
+			tempPos = Eigen::AngleAxisf(partial * theta, rotNorm) * radiusDir + centerPos;
+			// ä½ç½®åˆ†é‡å•ç‹¬è®¡ç®—ï¼Œå§¿æ€å’Œé™„åŠ å€¼æŒ‰çº¿æ€§ç´¯åŠ 
+			for (size_t i = 0; i < num; ++i) {
+				tempEndPoint[i] = i < 3 ? tempPos[i] : (prePoint[i] + relEndMove[i] * partial);
+			}
+			ret = this->moveC(axis, tempBegPoint, tempCenPoint, tempEndPoint, 1);
+			if (ret != 0)
+				return handle_zaux_error(ret);
+			tempBegPoint = tempEndPoint;
+			if (waveCfg.Dwell_right > 0) {
+				ret = ZAux_Direct_MoveDelay(handle_, axis[0], waveCfg.Dwell_right);
+				if (ret != 0)
+					return handle_zaux_error(ret);
+			}
+
+			// 1/2 * 2å‘¨æœŸ
+			for (size_t i = 0; i < numPeriod; ++i) {
+				partial += 1.0 / (2 * numPeriod);
 				tempPos = Eigen::AngleAxisf(partial * theta, rotNorm) * radiusDir + centerPos;
 				for (size_t i = 0; i < num; ++i) {
-					tempEndPoint[i] = i < 3 ? tempPos[i] : (endBuffer[i] + relEndMove[i] * partial);
+					tempEndPoint[i] = i < 3 ? tempPos[i] : (prePoint[i] + relEndMove[i] * partial);
+				}
+				ret = this->moveC(axis, tempBegPoint, tempCenPoint, tempEndPoint, 1);
+				if (ret != 0)
+					return handle_zaux_error(ret);
+				tempBegPoint = tempEndPoint;
+				if (waveCfg.Dwell_left > 0) {
+					ret = ZAux_Direct_MoveDelay(handle_, axis[0], waveCfg.Dwell_left);
+					if (ret != 0)
+						return handle_zaux_error(ret);
+
+				}
+				// æœ€åä¸€ä¸ªå‘¨æœŸé€€å‡º
+				if (i + 1 == numPeriod) break;
+
+				partial += 1.0 / (2 * numPeriod);
+				tempPos = Eigen::AngleAxisf(partial * theta, rotNorm) * radiusDir + centerPos;
+				for (size_t i = 0; i < num; ++i) {
+					tempEndPoint[i] = i < 3 ? tempPos[i] : (prePoint[i] + relEndMove[i] * partial);
 				}
 				ret = this->moveC(axis, tempBegPoint, tempCenPoint, tempEndPoint, 1);
 				if (ret != 0)
@@ -1860,72 +1934,61 @@ int32 ZauxRobot::swing_single_sin(DiscreteTrajectory<float>& discreteTrajectory,
 					ret = ZAux_Direct_MoveDelay(handle_, axis[0], waveCfg.Dwell_right);
 					if (ret != 0)
 						return handle_zaux_error(ret);
+
 				}
-
-				// 1/2 * 2ÖÜÆÚ
-				for (size_t i = 0; i < numPeriod; ++i) {
-					partial += 1.0 / (2 * numPeriod);
-					tempPos = Eigen::AngleAxisf(partial * theta, rotNorm) * radiusDir + centerPos;
-					for (size_t i = 0; i < num; ++i) {
-						tempEndPoint[i] = i < 3 ? tempPos[i] : (endBuffer[i] + relEndMove[i] * partial);
-					}
-					ret = this->moveC(axis, tempBegPoint, tempCenPoint, tempEndPoint, 1);
-					if (ret != 0)
-						return handle_zaux_error(ret);
-					tempBegPoint = tempEndPoint;
-					if (waveCfg.Dwell_left > 0) {
-						ret = ZAux_Direct_MoveDelay(handle_, axis[0], waveCfg.Dwell_left);
-						if (ret != 0)
-							return handle_zaux_error(ret);
-
-					}
-					// ×îºóÒ»¸öÖÜÆÚÍË³ö
-					if (i + 1 == numPeriod) break;
-
-					partial += 1.0 / (2 * numPeriod);
-					tempPos = Eigen::AngleAxisf(partial * theta, rotNorm) * radiusDir + centerPos;
-					for (size_t i = 0; i < num; ++i) {
-						tempEndPoint[i] = i < 3 ? tempPos[i] : (endBuffer[i] + relEndMove[i] * partial);
-					}
-					ret = this->moveC(axis, tempBegPoint, tempCenPoint, tempEndPoint, 1);
-					if (ret != 0)
-						return handle_zaux_error(ret);
-					tempBegPoint = tempEndPoint;
-					if (waveCfg.Dwell_right > 0) {
-						ret = ZAux_Direct_MoveDelay(handle_, axis[0], waveCfg.Dwell_right);
-						if (ret != 0)
-							return handle_zaux_error(ret);
-
-					}
-				}
-
-				// 1/4 ÖÜÆÚ
-				partial += 1.0 / (4 * numPeriod);
-				tempPos = Eigen::AngleAxisf(partial * theta, rotNorm) * radiusDir + centerPos;
-				for (size_t i = 0; i < num; ++i) {
-					tempEndPoint[i] = i < 3 ? tempPos[i] : (endBuffer[i] + relEndMove[i] * partial);
-				}
-				ret = this->moveC(axis, tempBegPoint, tempCenPoint, tempEndPoint, 1);
-				if (ret != 0)
-					return handle_zaux_error(ret);
-				tempBegPoint = tempEndPoint;
 			}
-			// °Ú¶¯Í£Ö¹
-			else {
-				ret = this->moveC(axis, endBuffer, *midPointIte, *nodePointIte);
-				if (ret != 0)
-					return handle_zaux_error(ret);
+
+			// 1/4 å‘¨æœŸ
+			partial += 1.0 / (4 * numPeriod);
+			tempPos = Eigen::AngleAxisf(partial * theta, rotNorm) * radiusDir + centerPos;
+			for (size_t i = 0; i < num; ++i) {
+				tempEndPoint[i] = i < 3 ? tempPos[i] : (prePoint[i] + relEndMove[i] * partial);
 			}
+			ret = this->moveC(axis, tempBegPoint, tempCenPoint, tempEndPoint, 1);
+			if (ret != 0)
+				return handle_zaux_error(ret);
+			tempBegPoint = tempEndPoint;
 		}
-		// Ö±ÏßÔË¶¯
+		// æ‘†åŠ¨åœæ­¢
 		else {
-			// »úÆ÷ÈËÍ£Ö¹
-			if (waveCfg.Dwell_type > 0 && (waveCfg.Dwell_left + waveCfg.Dwell_right) > 0 && numPeriod > 0) {
-				std::vector<float> detRelEndMove(relEndMove.size(), 0);
+			ret = this->moveC(axis, prePoint, midPoint, curPoint);
+			if (ret != 0)
+				return handle_zaux_error(ret);
+		}
+	}
+	// ç›´çº¿è¿åŠ¨
+	else {
+		// æœºå™¨äººåœæ­¢
+		if (waveCfg.Dwell_type > 0 && (waveCfg.Dwell_left + waveCfg.Dwell_right) > 0 && numPeriod > 0) {
+			std::vector<float> detRelEndMove(relEndMove.size(), 0);
 
-				// 1/4 ÖÜÆÚÔË¶¯Á¿
-				for (size_t j = 0; j < relEndMove.size(); ++j)
-					detRelEndMove[j] = relEndMove[j] / (numPeriod * 4);
+			// 1/4 å‘¨æœŸè¿åŠ¨é‡
+			for (size_t j = 0; j < relEndMove.size(); ++j)
+				detRelEndMove[j] = relEndMove[j] / (numPeriod * 4);
+			ret = this->moveL(axis, detRelEndMove);
+			if (ret != 0)
+				return handle_zaux_error(ret);
+			if (waveCfg.Dwell_right > 0) {
+				ret = ZAux_Direct_MoveDelay(handle_, axis[0], waveCfg.Dwell_right);
+				if (ret != 0)
+					return handle_zaux_error(ret);
+			}
+
+			// 1/2 å‘¨æœŸè¿åŠ¨é‡
+			for (size_t j = 0; j < relEndMove.size(); ++j)
+				detRelEndMove[j] *= 2;
+			for (int i = 0; i < numPeriod; ++i) {
+				ret = this->moveL(axis, detRelEndMove);
+				if (ret != 0)
+					return handle_zaux_error(ret);
+				if (waveCfg.Dwell_left > 0) {
+					ret = ZAux_Direct_MoveDelay(handle_, axis[0], waveCfg.Dwell_left);
+					if (ret != 0)
+						return handle_zaux_error(ret);
+				}
+				// æœ€åä¸€ä¸ªå‘¨æœŸé€€å‡º
+				if (i + 1 == numPeriod) break;
+
 				ret = this->moveL(axis, detRelEndMove);
 				if (ret != 0)
 					return handle_zaux_error(ret);
@@ -1934,49 +1997,21 @@ int32 ZauxRobot::swing_single_sin(DiscreteTrajectory<float>& discreteTrajectory,
 					if (ret != 0)
 						return handle_zaux_error(ret);
 				}
-
-				// 1/2 ÖÜÆÚÔË¶¯Á¿
-				for (size_t j = 0; j < relEndMove.size(); ++j)
-					detRelEndMove[j] *= 2;
-				for (int i = 0; i < numPeriod; ++i) {
-					ret = this->moveL(axis, detRelEndMove);
-					if (ret != 0)
-						return handle_zaux_error(ret);
-					if (waveCfg.Dwell_left > 0) {
-						ret = ZAux_Direct_MoveDelay(handle_, axis[0], waveCfg.Dwell_left);
-						if (ret != 0)
-							return handle_zaux_error(ret);
-					}
-					// ×îºóÒ»¸öÖÜÆÚÍË³ö
-					if (i + 1 == numPeriod) break;
-
-					ret = this->moveL(axis, detRelEndMove);
-					if (ret != 0)
-						return handle_zaux_error(ret);
-					if (waveCfg.Dwell_right > 0) {
-						ret = ZAux_Direct_MoveDelay(handle_, axis[0], waveCfg.Dwell_right);
-						if (ret != 0)
-							return handle_zaux_error(ret);
-					}
-				}
-				// 1/4 ÖÜÆÚÔË¶¯Á¿
-				for (size_t j = 0; j < relEndMove.size(); ++j)
-					detRelEndMove[j] /= 2;
-				ret = this->moveL(axis, detRelEndMove);
-				if (ret != 0)
-					return handle_zaux_error(ret);
 			}
-			// °Ú¶¯Í£Ö¹
-			else {
-				// Ïà¶ÔÔË¶¯
-				ret = this->moveL(axis, relEndMove);
-				if (ret != 0)
-					return handle_zaux_error(ret);
-			}
+			// 1/4 å‘¨æœŸè¿åŠ¨é‡
+			for (size_t j = 0; j < relEndMove.size(); ++j)
+				detRelEndMove[j] /= 2;
+			ret = this->moveL(axis, detRelEndMove);
+			if (ret != 0)
+				return handle_zaux_error(ret);
 		}
-
-		midPointIte++;
-		infoIte++;
+		// æ‘†åŠ¨åœæ­¢
+		else {
+			// ç›¸å¯¹è¿åŠ¨
+			ret = this->moveL(axis, relEndMove);
+			if (ret != 0)
+				return handle_zaux_error(ret);
+		}
 	}
 
 	return handle_zaux_error(ret);
@@ -1986,34 +2021,66 @@ int32 ZauxRobot::swing_single_tri(DiscreteTrajectory<float>& discreteTrajectory,
 	return 0;
 }
 
+int32 ZauxRobot::swing_single_empty(DiscreteTrajectory<float>& discreteTrajectory) {
+	// è½¨è¿¹ç‚¹ç»´åº¦ä¸é©±åŠ¨è½´ç»´åº¦çš„è¾ƒå°å€¼
+	size_t num = (std::min)(discreteTrajectory.nodePoint.begin()->size(), swingAxis.size());
+	std::vector<int> axis(swingAxis.begin(), swingAxis.begin() + num);
+	int ret = 0;
+
+	discreteTrajectory.reset_iterator();
+	if (discreteTrajectory.next() != 0) {
+		return 1;
+	}
+
+	auto prePoint = discreteTrajectory.get_preNodePoint();
+	auto curPoint = discreteTrajectory.get_nodePoint();
+	auto midPoint = discreteTrajectory.get_midPoint();
+	auto traj = discreteTrajectory.get_trajInfo();
+	// å½“å‰è½¨è¿¹çš„ç›¸å¯¹è¿åŠ¨é‡
+	std::vector<float> relEndMove = discreteTrajectory.get_relative_distance();
+
+	// åœ†å¼§è¿åŠ¨
+	if (traj.isArc()) {
+		ret = this->moveC(axis, prePoint, midPoint, curPoint);
+		if (ret != 0)
+			return handle_zaux_error(ret);
+	}
+	// ç›´çº¿è¿åŠ¨
+	else {
+		ret = this->moveL(axis, relEndMove);
+		if (ret != 0)
+			return handle_zaux_error(ret);
+	}
+}
+
 int32 ZauxRobot::update_track_config(const Track& trackCfg) {
 	std::vector<float> config(20, 0);
 	size_t configTableStart = 1010;
 	int ret = 0;
 
-	// ¶ÁÈ¡ÏÖÓĞ²ÎÊı
+	// è¯»å–ç°æœ‰å‚æ•°
 	ret = ZAux_Direct_GetTable(handle_, configTableStart, config.size(), config.data());
 	if (ret != 0)
 		return handle_zaux_error(ret);
 
-	// ×óÓÒ¸ú×Ù²ÎÊı
+	// å·¦å³è·Ÿè¸ªå‚æ•°
 	config[0] = trackCfg.Lr_enable;
 	config[1] = trackCfg.Lr_offset;
 	config[2] = trackCfg.Lr_gain;
-	// »ı·Ö³£Êı
+	// ç§¯åˆ†å¸¸æ•°
 	config[3] = trackCfg.Lr_maxSingleCompensation;
 	//config[4] = trackCfg.Lr_diffCoeff;
 	config[5] = trackCfg.Lr_minCompensation;
 	config[6] = trackCfg.Lr_maxCompensation;
 	config[7] = trackCfg.Lr_MaxCorrectAngle;
-	// ÉÏÏÂ¸ú×Ù²ÎÊı
+	// ä¸Šä¸‹è·Ÿè¸ªå‚æ•°
 	config[10] = trackCfg.Ud_enable;
 	config[11] = trackCfg.Ud_offset;
 	config[12] = trackCfg.Ud_gain;
 	config[15] = trackCfg.Ud_minCompensation;
 	config[16] = trackCfg.Ud_maxCompensation;
 	config[17] = trackCfg.Ud_MaxCorrectAngle;
-	// ÆäËû²ÎÊı
+	// å…¶ä»–å‚æ•°
 	config[18] = trackCfg.SegCorrectCycles;
 	config[19] = trackCfg.Ud_refSampleCount;
 
@@ -2021,7 +2088,7 @@ int32 ZauxRobot::update_track_config(const Track& trackCfg) {
 	//if (ret != 0)
 	//	return handle_zaux_error(ret);
 	for (size_t i = 0; i < config.size(); ++i) {
-		ret = ZAux_Direct_MoveTable(handle_, swingAxisIdx_[0], 1010+i, config[i]);
+		ret = ZAux_Direct_MoveTable(handle_, swingAxisIdx[0], 1010+i, config[i]);
 		if (ret != 0)
 			return handle_zaux_error(ret);
 	}
@@ -2034,16 +2101,16 @@ int32 ZauxRobot::update_welder_config(const Arc_WeldingParaItem& weldCfg) {
 	size_t configTableStart = 1030;
 	int ret = 0;
 
-	// µçÁ÷
-	ret = ZAux_Direct_MoveTable(handle_, swingAxisIdx_[0], 1035, weldCfg.WeldingCrt_Spd);
+	// ç”µæµ
+	ret = ZAux_Direct_MoveTable(handle_, swingAxisIdx[0], 1035, weldCfg.WeldingCrt_Spd);
 	if (ret != 0)
 		return handle_zaux_error(ret);
-	// µçÑ¹
-	ret = ZAux_Direct_MoveTable(handle_, swingAxisIdx_[0], 1036, weldCfg.WeldingVtg_Strth);
+	// ç”µå‹
+	ret = ZAux_Direct_MoveTable(handle_, swingAxisIdx[0], 1036, weldCfg.WeldingVtg_Strth);
 	if (ret != 0)
 		return handle_zaux_error(ret);
-	// Ö´ĞĞĞŞ¸Ä
-	ret = ZAux_Direct_MoveTable(handle_, swingAxisIdx_[0], 1030, 1);
+	// æ‰§è¡Œä¿®æ”¹
+	ret = ZAux_Direct_MoveTable(handle_, swingAxisIdx[0], 1030, 1);
 	if (ret != 0)
 		return handle_zaux_error(ret);
 
@@ -2058,13 +2125,14 @@ int32 ZauxRobot::handle_zaux_error(int32 errCode) {
 }
 
 
+/* ******************************** ä¸‹ä½æœºäº¤äº’ *********************************/
+// ä¸‹ä½æœºç´§æ€¥ä¿¡å·è§¦å‘
 int32 ZauxRobot::emergency_pause() {
 	float zero = 0.0, pauseFlag = 1.0;
 	int ret = ZAux_Direct_SetTable(handle_, 1004, 1, &pauseFlag);
 	std::cout << "Active PAUSE triggered." << std::endl;
 	return ret;
 }
-
 
 int32 ZauxRobot::emergency_resume() {
 	float zero = 0.0, resumeFlag = 2.0;
@@ -2073,14 +2141,13 @@ int32 ZauxRobot::emergency_resume() {
 	return ret;
 }
 
-
 int32 ZauxRobot::emergency_stop() {
 	float zero = 0.0, stopFlag = 3.0, negtive = -1.0;
 	int ret = 0;
 	ZAux_Direct_SetTable(handle_, 1004, 1, &stopFlag);
 	std::cout << "Active PAUSE triggered." << std::endl;
 
-	// °Ú¶¯±êÖ¾Î»¸´Î»
+	// æ‘†åŠ¨æ ‡å¿—ä½å¤ä½
 	ZAux_Direct_SetTable(handle_, 1000, 1, &negtive);
 
 	return ret;
