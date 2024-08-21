@@ -988,20 +988,22 @@ int32 ZauxRobot::update_swing_table(const Weave& waveCfg) {
 	// 摆动频率
 	float freq = waveCfg.Freq;
 	// 摆动振幅
-	float ampl = (waveCfg.LeftWidth + waveCfg.RightWidth) / 2;
+	//float ampl = (waveCfg.LeftWidth + waveCfg.RightWidth) / 2;
+	float ampl = waveCfg.RightWidth;
 	// 停止模式
 	int holdType = waveCfg.Dwell_type;
 	// 机器人停留时间, 摆动停留时间 (仅一个生效)
 	float robotHoldTime = 0.0, swingHoldTime = 0.0;
 
-	// 机器人停止
-	if (holdType > 0) {
+	float detAmpl = (waveCfg.LeftWidth - waveCfg.RightWidth) / (waveCfg.LeftWidth + waveCfg.RightWidth);
+	float detQ = std::asin(detAmpl);
+	// 凸轮表连续：机器人停止 | 停留时间为0
+	if (holdType > 0 || waveCfg.Dwell_left + waveCfg.Dwell_right < 1e-3) {
 		// 左右摆幅不同
 		if (std::fabs(waveCfg.LeftWidth - waveCfg.RightWidth) > 1e-1) {
 			for (size_t i = 0; i < numInterp; ++i) {
-				waveGenerator[i] = std::sin(2 * M_PI * i / (numInterp - 1));
-				// 左摆动
-				waveGenerator[i] *= i > numInterp / 2 ? waveCfg.LeftWidth / waveCfg.RightWidth : 1;
+				waveGenerator[i] = std::sin(2 * M_PI * i / (numInterp - 1) + detQ) - detAmpl;
+				waveGenerator[i] /= (1-detAmpl);
 			}
 			sinTableBeg = 2100;
 			for (size_t i = 0; i < numInterp; ++i) {
@@ -1011,42 +1013,49 @@ int32 ZauxRobot::update_swing_table(const Weave& waveCfg) {
 					return handle_zaux_error(ret);
 			}
 		}
-		else {
-			robotHoldTime = (waveCfg.Dwell_left + waveCfg.Dwell_right) / 2;
-		}
 	}
-	// 摆动停留时间
-	else if (holdType == 0 && waveCfg.Dwell_left + waveCfg.Dwell_right > 0) {
+	// 摆动停止: 判断条件与swing_on中对齐
+	else if (holdType == 0 && waveCfg.Dwell_left + waveCfg.Dwell_right > 1e-3) {
 		swingHoldTime = waveCfg.Dwell_left + waveCfg.Dwell_right;
 		// 周期时间(ms)
 		float totalTime = 1000 / freq + swingHoldTime;
 		// 四分之一摆动周期占用的 table 个数
 		size_t numQuarter = numInterp * (1000 / freq) / totalTime / 4;
 		// 右停留时间占用的 table 个数
-		//size_t numRightHold = numInterp * waveCfg.Dwell_right / totalTime;
 		size_t numRightHold = (numInterp - 4 * numQuarter) * waveCfg.Dwell_right / swingHoldTime;
+		// 
+		int numOffset = numQuarter * std::asin(detAmpl) * 2 / M_PI;
+
+		// 构造凸轮表
+		size_t begIdx = 0, endIdx = numQuarter - numOffset;
+		for (size_t i = begIdx; i < endIdx; ++i) {
+			waveGenerator[i] = std::sin(2 * M_PI * i / (4 * numQuarter - 1) + detQ) - detAmpl;
+			waveGenerator[i] /= (1 - detAmpl);
+		}
+		begIdx = endIdx;
+		endIdx += numRightHold;
+		for (size_t i = begIdx; i < endIdx; ++i) {
+			waveGenerator[i] = 1;
+		}
+		begIdx = endIdx;
+		endIdx += numQuarter * 2;
+		for (size_t i = begIdx; i < endIdx; ++i) {
+			waveGenerator[i] = std::sin(2 * M_PI * (i - numRightHold) / (4 * numQuarter - 1) + detQ) - detAmpl;
+			waveGenerator[i] /= (1 - detAmpl);
+		}
+		begIdx = endIdx;
+		endIdx += numInterp - 4 * numQuarter - numRightHold;
+		for (size_t i = begIdx; i < endIdx; ++i) {
+			waveGenerator[i] = (-1 - detAmpl) / (1 - detAmpl);
+		}
+		begIdx = endIdx;
+		endIdx = numInterp;
+		for (size_t i = begIdx; i < endIdx; ++i) {
+			waveGenerator[i] = std::sin(2 * M_PI * (i - numInterp + 4 * numQuarter) / (4 * numQuarter - 1) + detQ) - detAmpl;
+			waveGenerator[i] /= (1 - detAmpl);
+		}
 
 		// 缓冲中写入凸轮表
-		for (size_t i = 0; i < 4 * numQuarter; ++i) {
-			// 插值点对应的偏移幅值
-			float tmp = std::sin(2 * M_PI * i / (4 * numQuarter - 1));
-			if (i < numQuarter) {
-				waveGenerator[i] = tmp;
-			}
-			else if (i < 3 * numQuarter) {
-				waveGenerator[numRightHold + i] = tmp;
-			}
-			else {
-				waveGenerator[numInterp - 4 * numQuarter + i] = tmp;
-			}
-		}
-		for (size_t i = 0; i < numRightHold; ++i) {
-			waveGenerator[numQuarter + i] = 1;
-		}
-		for (size_t i = 0; i < numInterp - 4 * numQuarter - numRightHold; ++i) {
-			waveGenerator[3 * numQuarter + numRightHold + i] = -1;
-		}
-
 		sinTableBeg = 2100;
 		for (size_t i = 0; i < numInterp; ++i) {
 			ret = ZAux_Direct_MoveTable(handle_, excuteAxis[0], sinTableBeg + i, waveGenerator[i]);
@@ -1075,7 +1084,8 @@ int32 ZauxRobot::swing_on(float vel, const Weave& waveCfg, const std::vector<flo
 	// 摆动频率
 	float freq = waveCfg.Freq;
 	// 摆动振幅
-	float ampl = (waveCfg.LeftWidth + waveCfg.RightWidth) / 2;
+	//float ampl = (waveCfg.LeftWidth + waveCfg.RightWidth) / 2;
+	float ampl = waveCfg.RightWidth;
 	// 停止模式
 	int holdType = waveCfg.Dwell_type;
 	// 机器人停留时间, 摆动停留时间 (仅一个生效)
@@ -1085,7 +1095,8 @@ int32 ZauxRobot::swing_on(float vel, const Weave& waveCfg, const std::vector<flo
 	}
 
 	//sinTableBeg = holdType > 0 ? 2000 : 2100;
-	sinTableBeg = ((holdType == 0 && waveCfg.Dwell_left + waveCfg.Dwell_right > 0) || (std::fabs(waveCfg.LeftWidth - waveCfg.RightWidth) > 1e-1)) ? 2100 : 2000;
+	bool sinTableFlag = ((holdType > 0 || waveCfg.Dwell_left + waveCfg.Dwell_right < 1e-3) && std::fabs(waveCfg.LeftWidth - waveCfg.RightWidth) > 1e-1) || (holdType == 0 && waveCfg.Dwell_left + waveCfg.Dwell_right > 1e-3);
+	sinTableBeg = sinTableFlag ? 2100 : 2000;
 
 	// 周期长度
 	float dist = vel * (1/freq + swingHoldTime/1000);
@@ -1911,8 +1922,11 @@ int32 ZauxRobot::swing_single_sin(DiscreteTrajectory<float>& discreteTrajectory,
 			float partial = 0, theta = rotNorm.norm();
 			rotNorm.normalize();
 
+			// 第一次停留时的运动距离
+			float detQ = std::asin((waveCfg.LeftWidth - waveCfg.RightWidth) / (waveCfg.LeftWidth + waveCfg.RightWidth));
 			// 1/4 周期
-			partial += 1.0 / (4 * numPeriod);
+			//partial += 1.0 / (4 * numPeriod);
+			partial += 1.0 / numPeriod * (M_PI / 2 - detQ) / (2 * M_PI);
 			tempPos = Eigen::AngleAxisf(partial * theta, rotNorm) * radiusDir + centerPos;
 			// 位置分量单独计算，姿态和附加值按线性累加
 			for (size_t i = 0; i < num; ++i) {
@@ -1948,7 +1962,8 @@ int32 ZauxRobot::swing_single_sin(DiscreteTrajectory<float>& discreteTrajectory,
 				// 最后一个周期退出
 				if (i + 1 == numPeriod) break;
 
-				partial += 1.0 / (2 * numPeriod);
+				//partial += 1.0 / (2 * numPeriod);
+				partial += 1.0 / numPeriod * (M_PI / 2 + detQ) / (2 * M_PI);
 				tempPos = Eigen::AngleAxisf(partial * theta, rotNorm) * radiusDir + centerPos;
 				for (size_t i = 0; i < num; ++i) {
 					tempEndPoint[i] = i < 3 ? tempPos[i] : (prePoint[i] + relEndMove[i] * partial);
@@ -1989,9 +2004,12 @@ int32 ZauxRobot::swing_single_sin(DiscreteTrajectory<float>& discreteTrajectory,
 		if (waveCfg.Dwell_type > 0 && (waveCfg.Dwell_left + waveCfg.Dwell_right) > 0 && numPeriod > 0) {
 			std::vector<float> detRelEndMove(relEndMove.size(), 0);
 
+			// 第一次停留时的运动距离
+			float detQ = std::asin((waveCfg.LeftWidth - waveCfg.RightWidth) / (waveCfg.LeftWidth + waveCfg.RightWidth));
 			// 1/4 周期运动量
 			for (size_t j = 0; j < relEndMove.size(); ++j)
-				detRelEndMove[j] = relEndMove[j] / (numPeriod * 4);
+				//detRelEndMove[j] = relEndMove[j] / (numPeriod * 4);
+				detRelEndMove[j] = relEndMove[j] / numPeriod * (M_PI / 2 - detQ) / (2 * M_PI);
 			ret = this->moveL(axis, detRelEndMove);
 			if (ret != 0)
 				return handle_zaux_error(ret);
@@ -2003,7 +2021,8 @@ int32 ZauxRobot::swing_single_sin(DiscreteTrajectory<float>& discreteTrajectory,
 
 			// 1/2 周期运动量
 			for (size_t j = 0; j < relEndMove.size(); ++j)
-				detRelEndMove[j] *= 2;
+				//detRelEndMove[j] *= 2;
+				detRelEndMove[j] = relEndMove[j] / (numPeriod * 2);
 			for (int i = 0; i < numPeriod; ++i) {
 				ret = this->moveL(axis, detRelEndMove);
 				if (ret != 0)
@@ -2027,7 +2046,8 @@ int32 ZauxRobot::swing_single_sin(DiscreteTrajectory<float>& discreteTrajectory,
 			}
 			// 1/4 周期运动量
 			for (size_t j = 0; j < relEndMove.size(); ++j)
-				detRelEndMove[j] /= 2;
+				//detRelEndMove[j] /= 2;
+				detRelEndMove[j] = relEndMove[j] / numPeriod * (M_PI / 2 + detQ) / (2 * M_PI);
 			ret = this->moveL(axis, detRelEndMove);
 			if (ret != 0)
 				return handle_zaux_error(ret);

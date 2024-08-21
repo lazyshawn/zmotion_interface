@@ -58,13 +58,14 @@ int main() {
 
 void shawn_test::zswing() {
 	// 摆焊参数
+	waveCfg.Id = 1;
 	waveCfg.Shape = 0;
 	waveCfg.Freq = 1.0;
-	waveCfg.LeftWidth = 3.2;
-	waveCfg.RightWidth = 3.2;
-	waveCfg.Dwell_left = 0;
-	waveCfg.Dwell_right = 0;
-	waveCfg.Dwell_type = 1;
+	waveCfg.LeftWidth = 4;
+	waveCfg.RightWidth = 2;
+	waveCfg.Dwell_left = 100;
+	waveCfg.Dwell_right = 200;
+	waveCfg.Dwell_type = 0;
 
 	waveCfg2.Shape = 0;
 	waveCfg2.Freq = 2.0;
@@ -95,10 +96,10 @@ void shawn_test::zswing() {
 	/* ****  **** */
 	// base(0,1,2,3,4,5) moveabs(-10.9961, -11.7299, 34.4224, 0, 67.3076, -55.9961)
 	discreteTrajectory.set_starting_point({ 132.561005,3.092700,-420.473999,-191.216995,-55.311699,-102.778000, 0 });
-	discreteTrajectory.add_line({ 124.508003,4.327800,-410.992004,-8.733237,-111.726524,65.269234, 0.0 }, trajCfg);
-	discreteTrajectory.add_line({ 120.498001,1.379500,-352.433014,-7.894470,-104.864510,65.795158, 0.0 }, trajCfg2);
-	//discreteTrajectory.add_line({ 8.252900,-163.563995,-424.289001,-0.800630,-124.622124,21.578623, 0.0 });
-	//discreteTrajectory.add_line({ 16.843000,-320.963989,-425.096008,2.802146,-119.946411,42.512638, 0.0 });
+	//discreteTrajectory.add_line({ 124.508003,4.327800,-410.992004,-8.733237,-111.726524,65.269234, 0.0 }, trajCfg);
+	//discreteTrajectory.add_line({ 120.498001,1.379500,-352.433014,-7.894470,-104.864510,65.795158, 0.0 }, trajCfg2);
+	discreteTrajectory.add_line({ 8.252900,-163.563995,-424.289001,-0.800630,-124.622124,21.578623, 0.0 }, trajCfg);
+	//discreteTrajectory.add_line({ 16.843000,-320.963989,-425.096008,2.802146,-119.946411,42.512638, 0.0 }, trajCfg);
 	//discreteTrajectory.equally_divide({ 200, 100 });
 
 	//18,19,20,21,22,23,24,25,26
@@ -121,8 +122,8 @@ void shawn_test::zswing() {
 	//robot.move_ptp_abs({ 100,120,80,50,80,30 }, 0.5);
 	//robot.moveJ({ 100,120,80,50,80,30,20 }, 0.5, false);
 	//robot.swing_trajectory(discreteTrajectory, waveCfg);
-	robot.execute_discrete_trajectory(discreteTrajectory);
-	//robot.swing_trajectory(discreteTrajectory);
+	//robot.execute_discrete_trajectory(discreteTrajectory);
+	robot.swing_trajectory(discreteTrajectory);
 }
 
 
