@@ -1,4 +1,4 @@
-#include <windows.h>
+ï»¿#include <windows.h>
 #include<iostream>
 #include<bitset>
 
@@ -6,40 +6,44 @@
 
 
 ZauxRobot robot, robotB;
-// handle, Áù¸ö¹Ø½ÚÖá, »úĞµ±ÛÎ»ÖÃ, TCP×ËÌ¬, ÊÀ½ç×ø±êÏµÏÂTCPÎ»ÖÃ, ¸½¼ÓÖá, Í¹ÂÖÖá, ²å²¹Ê¸Á¿Öá
+// handle, å…­ä¸ªå…³èŠ‚è½´, æœºæ¢°è‡‚ä½ç½®, TCPå§¿æ€, ä¸–ç•Œåæ ‡ç³»ä¸‹TCPä½ç½®, é™„åŠ è½´, å‡¸è½®è½´, æ’è¡¥çŸ¢é‡è½´
 //ZauxRobot robotB(robot.handle_, { 0,1,2,3,4,5 }, { 9,10,11 }, { 12,13,14 }, { 15,16,17 }, { 18,19,20 }, { 36,37,38 }, { 39 });
 
 namespace shawn_test {
-	// ¹ì¼£´¦Àí
+	// è½¨è¿¹å¤„ç†
 	DiscreteTrajectory<float> discreteTrajectory;
-	// °Úº¸²ÎÊı
+	// æ‘†ç„Šå‚æ•°
 	Weave waveCfg, waveCfg2;
-	// µç»¡¸ú×Ù²ÎÊı
+	// ç”µå¼§è·Ÿè¸ªå‚æ•°
 	Track trackCfg, trackCfg2;
-	// º¸½Ó²ÎÊı
+	// ç„Šæ¥å‚æ•°
 	Arc_WeldingParaItem weldCfg, weldCfg2;
 
 	void dec_to_hex();
 	void hex_to_dec(uint16_t high, uint16_t low);
 	void format_float(std::string ifname, std::string ofname);
 	void zswing();
-	// ¶ÁÈ¡²¢±£´æµçÁ÷Öµ
-	void save_current(const std::string& fold = "arc_tracking/");
+	// è¯»å–å¹¶ä¿å­˜ç”µæµå€¼
+	void save_current(const std::string& fold);
+
 }
 //using namespace shawn_test;
 
 int main() {
 	//format_float("C:\\Users\\15874\\Desktop\\SD0.BIN", "C:\\Users\\15874\\Desktop\\SD0.txt");
 
-	if (robot.lazy_connect() > 0) {
-		std::cout << "\nConnect error, Press <Enter> exist!\n" << std::endl;
-		getchar();
-		return 1;
-	}
+	//if (robot.lazy_connect() > 0) {
+	//	std::cout << "\nConnect error, Press <Enter> exist!\n" << std::endl;
+	//	getchar();
+	//	return 1;
+	//}
+	std::string ip = "127.0.0.1";
+	int ret = robot.connect(ip);
+	robot.derive_config();
 
-	//// ÉèÖÃ¾ä±ú
+	//// è®¾ç½®å¥æŸ„
 	//robotB.set_handle(robot.handle_);
-	//// ÉèÖÃÖáºÅ: Áù¸ö¹Ø½ÚÖá, »úĞµ±Û×ø±êÏµÏÂTCPÎ»ÖÃ, TCP×ËÌ¬, ÊÀ½ç×ø±êÏµÏÂTCPÎ»ÖÃ, ¸½¼ÓÖá, Í¹ÂÖÖá, °Ú¶¯Öá, ²å²¹Ê¸Á¿Öá
+	//// è®¾ç½®è½´å·: å…­ä¸ªå…³èŠ‚è½´, æœºæ¢°è‡‚åæ ‡ç³»ä¸‹TCPä½ç½®, TCPå§¿æ€, ä¸–ç•Œåæ ‡ç³»ä¸‹TCPä½ç½®, é™„åŠ è½´, å‡¸è½®è½´, æ‘†åŠ¨è½´, æ’è¡¥çŸ¢é‡è½´
 	//robotB.set_axis({ 0,1,2,3,4,5 }, { 7,8,9 }, { 10,11,12 }, { 7,8,9 }, {  }, { 36,37,38 }, { 40,41,42 }, { 39 });
 
 	shawn_test::zswing();
@@ -48,63 +52,67 @@ int main() {
 	printf("Press <Enter> to exit.\n");
 	//getchar();
 
-	//// ¶Ï¿ªÁ¬½Ó
+	//// æ–­å¼€è¿æ¥
 	//robot.disconnect();
 	return 0;
 }
 
 void shawn_test::zswing() {
-	//robot.test();
-
-	// °Úº¸²ÎÊı
+	// æ‘†ç„Šå‚æ•°
+	waveCfg.Id = 1;
 	waveCfg.Shape = 0;
-	waveCfg.Length = 3;
-	waveCfg.Bias = 2;
 	waveCfg.Freq = 1.0;
 	waveCfg.LeftWidth = 4;
 	waveCfg.RightWidth = 2;
 	waveCfg.Dwell_left = 100;
-	waveCfg.Dwell_right = 100;
-	waveCfg.Dwell_type = 1;
-	waveCfg.Angle_Ltype_top = 0;
-	waveCfg.Angle_Ltype_btm = 0;
+	waveCfg.Dwell_right = 200;
+	waveCfg.Dwell_type = 0;
 
 	waveCfg2.Shape = 0;
 	waveCfg2.Freq = 2.0;
 	waveCfg2.LeftWidth = 2;
 	waveCfg2.RightWidth = 2;
-	waveCfg2.Dwell_left = 200;
-	waveCfg2.Dwell_right = 200;
+	waveCfg2.Dwell_left = 0;
+	waveCfg2.Dwell_right = 0;
 	waveCfg2.Dwell_type = 0;
 
-	// µç»¡¸ú×Ù²ÎÊı
+	// ç”µå¼§è·Ÿè¸ªå‚æ•°
 	trackCfg.Lr_enable = 0;
 	trackCfg.Ud_enable = 0;
-	//robot.update_track_config(trackCfg);
 
-	// º¸½Ó²ÎÊı
+	// ç„Šæ¥å‚æ•°
 	weldCfg.WeldingSpeed = 20;
 	weldCfg2.WeldingSpeed = 30;
 
+	TrajectoryConfig<float> trajCfg;
+	trajCfg.speed = weldCfg.WeldingSpeed;
+	trajCfg.smooth = 10;
+	trajCfg.set_appendix(serialize_weld_param(waveCfg, weldCfg, trackCfg));
+
+	TrajectoryConfig<float> trajCfg2;
+	trajCfg2.speed = weldCfg2.WeldingSpeed;
+	trajCfg2.smooth = 10;
+	trajCfg2.set_appendix(serialize_weld_param(waveCfg2, weldCfg2, trackCfg2));
 
 	/* ****  **** */
 	// base(0,1,2,3,4,5) moveabs(-10.9961, -11.7299, 34.4224, 0, 67.3076, -55.9961)
 	discreteTrajectory.set_starting_point({ 132.561005,3.092700,-420.473999,-191.216995,-55.311699,-102.778000, 0 });
-	//discreteTrajectory.add_line({ 124.508003,4.327800,-410.992004,-8.733237,-111.726524,65.269234, 0.0 }, waveCfg, trackCfg, weldCfg);
-	//discreteTrajectory.add_line({ 120.498001,1.379500,-352.433014,-7.894470,-104.864510,65.795158, 0.0 }, waveCfg, trackCfg, weldCfg);
-	discreteTrajectory.add_line({ 121.116997,0.437300,-344.458008,-7.285388,-104.983093,64.644684, 0.0 }, waveCfg, trackCfg, weldCfg);
+	//discreteTrajectory.add_line({ 124.508003,4.327800,-410.992004,-8.733237,-111.726524,65.269234, 0.0 }, trajCfg);
+	//discreteTrajectory.add_line({ 120.498001,1.379500,-352.433014,-7.894470,-104.864510,65.795158, 0.0 }, trajCfg2);
+	discreteTrajectory.add_line({ 8.252900,-163.563995,-424.289001,-0.800630,-124.622124,21.578623, 0.0 }, trajCfg);
+	//discreteTrajectory.add_line({ 16.843000,-320.963989,-425.096008,2.802146,-119.946411,42.512638, 0.0 }, trajCfg);
 	//discreteTrajectory.equally_divide({ 200, 100 });
 
 	//18,19,20,21,22,23,24,25,26
 	//discreteTrajectory.set_starting_point({ 1000, -200, 200, 179.9990, -28.8890, 135, 0 });
-	//discreteTrajectory.add_line({ 1000, 0, 200, 179.9990, -28.8890, 135, 0.0 }, waveCfg, trackCfg, weldCfg);
+	//discreteTrajectory.add_line({ 1000, 0, 200, 179.9990, -28.8890, 135, 0.0 }, trajCfg);
 	//discreteTrajectory.add_line({ 1000, 200, 200, 179.9990, -28.8890, 135, 0.0 }, waveCfg2, trackCfg2, weldCfg2);
 	//discreteTrajectory.add_line({ 1200, 0, 200, 179.9990, -28.8900, 45, 0.0 }, 50);
 
 	//discreteTrajectory.set_starting_point({ -22.873100,-1467.822754,-17.759701,178.017395,-43.356602,-46.023201,-85.892502, 0 });
-	//discreteTrajectory.add_arc({ 759.797,97.0257,93.728,168.197,-46.3449,78.4946, 0 }, { 720.393,158.951,92.2991,-179.413,-48.6368,1.0271, 0 }, 20);
-	//discreteTrajectory.add_line({ -22.873072, -1467.822754, -17.759697, -1.982573, -136.643463, 133.976715, -85.892509, 0.0 }, 25, 5);
-	//robot.swing_trajectory(discreteTrajectory, waveCfg);
+	//discreteTrajectory.add_arc({ 759.797,97.0257,93.728,168.197,-46.3449,78.4946, 0 }, { 720.393,158.951,92.2991,-179.413,-48.6368,1.0271, 0 }, trajCfg);
+	//discreteTrajectory.add_line({ -22.873072, -1467.822754, -17.759697, -1.982573, -136.643463, 133.976715, -85.892509, 0.0 }, trajCfg2);
+
 
 	/* ****  **** */
 	//robot.swing_tri();
@@ -112,9 +120,10 @@ void shawn_test::zswing() {
 	/* ****  **** */
 	//discreteTrajectory.corner_transition();
 	//discreteTrajectory.corner_slowdown(10);
-	//robot.execute_discrete_trajectory_abs(discreteTrajectory);
-	//robot.swing_trajectory(discreteTrajectory, waveCfg);
 	//robot.move_ptp_abs({ 100,120,80,50,80,30 }, 0.5);
+	//robot.moveJ({ 100,120,80,50,80,30,20 }, 0.5, false);
+	//robot.swing_trajectory(discreteTrajectory, waveCfg);
+	//robot.execute_discrete_trajectory(discreteTrajectory);
 	robot.swing_trajectory(discreteTrajectory);
 }
 
@@ -149,9 +158,9 @@ void shawn_test::format_float(std::string ifname, std::string ofname) {
 void shawn_test::dec_to_hex() {
 	int dec = 65533;
 	uint16_t bin = dec;
-	// µÍ°ËÎ»
+	// ä½å…«ä½
 	uint8_t low = bin & 0x00FF;
-	// ¸ß°ËÎ»
+	// é«˜å…«ä½
 	uint8_t high = bin >> 8;
 	printf("high = %d\n", high);
 	printf("low = %d\n", low);
@@ -169,14 +178,15 @@ void shawn_test::hex_to_dec(uint16_t high, uint16_t low) {
 }
 
 
+
 void shawn_test::save_current(const std::string& fold) {
-	// ¶ÁÈ¡µãÊı
+	// è¯»å–ç‚¹æ•°
 	float tmpTable = 0.0;
 	int numPoint = 0;
 	size_t maxNum = 1000, times = 0, saverIdx = 0;
 	std::vector<float> tableData(maxNum, 0);
 
-	// ÖÜÆÚ¿ªÊ¼µÄË÷Òı
+	// å‘¨æœŸå¼€å§‹çš„ç´¢å¼•
 	saverIdx = 100000;
 	ZAux_Direct_GetTable(robot.handle_, saverIdx, 1, (float*)&tmpTable);
 	numPoint = std::floor(tmpTable);
@@ -184,7 +194,7 @@ void shawn_test::save_current(const std::string& fold) {
 	printf("num of sin period: %d\n", numPoint);
 	robot.save_table(saverIdx+1, numPoint, fold + "SD0_idx.txt");
 
-	// Ô­Ê¼µçÁ÷Öµ
+	// åŸå§‹ç”µæµå€¼
 	saverIdx = 105000;
 	ZAux_Direct_GetTable(robot.handle_, saverIdx, 1, (float*)&tmpTable);
 	numPoint = std::floor(tmpTable);
@@ -192,7 +202,7 @@ void shawn_test::save_current(const std::string& fold) {
 	printf("num of raw current: %d\n", numPoint);
 	robot.save_table(saverIdx + 1, numPoint, fold + "SD0.txt");
 
-	// ÂË²¨ºóµÄµçÁ÷Öµ
+	// æ»¤æ³¢åçš„ç”µæµå€¼
 	saverIdx = 110000;
 	ZAux_Direct_GetTable(robot.handle_, saverIdx, 1, (float*)&tmpTable);
 	numPoint = std::floor(tmpTable);
@@ -200,7 +210,7 @@ void shawn_test::save_current(const std::string& fold) {
 	printf("num of fined current: %d\n", numPoint);
 	robot.save_table(saverIdx + 1, numPoint, fold + "SD0_f.txt");
 
-	// ÂË²¨ºóµÄµçÑ¹Öµ
+	// æ»¤æ³¢åçš„ç”µå‹å€¼
 	saverIdx = 115000;
 	ZAux_Direct_GetTable(robot.handle_, saverIdx, 1, (float*)&tmpTable);
 	numPoint = std::floor(tmpTable);

@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include<vector>
 #include<list>
@@ -7,13 +7,13 @@
 
 #include<iostream>
 
-#include"FsCraftDef.h"
+//#include"FsCraftDef.h"
 
 
 /**
-* @brief  ¼ÆËãµÈĞ§µÄ Rzyx Å·À­½Ç
-* @param  endEuler    ¸ø¶¨Å·À­½Ç <Rx, Ry, Rz>
-* @return µÈĞ§µÄ Rzyx Å·À­½Ç
+* @brief  è®¡ç®—ç­‰æ•ˆçš„ Rzyx æ¬§æ‹‰è§’
+* @param  endEuler    ç»™å®šæ¬§æ‹‰è§’ <Rx, Ry, Rz>
+* @return ç­‰æ•ˆçš„ Rzyx æ¬§æ‹‰è§’
 */
 template <typename T>
 Eigen::Matrix<T, 3, 1> get_equivalent_zyx_euler(const Eigen::Matrix<T, 3, 1>& endEuler) {
@@ -50,11 +50,12 @@ Eigen::Matrix<T, 3, 1> get_equivalent_zyx_euler(const Eigen::Matrix<T, 3, 1>& en
 }
 
 /**
-* @brief  ¼ÆËãÁ½×é Rzyx Å·À­½ÇÖ®¼äµÄÏà¶ÔÔË¶¯¾àÀë
-* @param  begEuler           ÆğµãÅ·À­½Ç <Rx, Ry, Rz>
-* @param  endEuler           ÈÆ y ×ª½Ç(deg)
-* @param  chooseMimumDist    ÈÆ z ×ª½Ç(deg)
-* @return Ïà¶ÔÔË¶¯¾àÀë
+* @brief  è®¡ç®—ä¸¤ç»„ Rzyx æ¬§æ‹‰è§’ä¹‹é—´çš„ç›¸å¯¹è¿åŠ¨è·ç¦»
+* @param  begEuler           èµ·ç‚¹æ¬§æ‹‰è§’ <Rx, Ry, Rz>
+* @param  midEuler           ä¸­é—´ç‚¹æ¬§æ‹‰è§’ <Rx, Ry, Rz>
+* @param  endEuler           ç»ˆç‚¹æ¬§æ‹‰è§’ <Rx, Ry, Rz>
+* @param  chooseMimumDist    é€‰æ‹©åŠ£å¼§è§’
+* @return ç›¸å¯¹è¿åŠ¨è·ç¦»
 */
 template <typename T>
 Eigen::Matrix<T, 3, 1> get_zyx_euler_distance(Eigen::Matrix<T, 3, 1>& begEuler, Eigen::Matrix<T, 3, 1>& endEuler, bool chooseMimumDist = 1) {
@@ -88,7 +89,7 @@ Eigen::Matrix<T, 3, 1> get_zyx_euler_distance(Eigen::Matrix<T, 3, 1>& begEuler, 
 		}
 	}
 
-	// Å·À­½ÇÏà¶ÔÖµ
+	// æ¬§æ‹‰è§’ç›¸å¯¹å€¼
 	Eigen::Matrix<T, 3, 1> endRel(0, 0, 0), equivRel(0, 0, 0);
 	T endSum = 0.0, equivSum = 0.0;
 	for (size_t i = 0; i < 3; ++i) {
@@ -98,7 +99,7 @@ Eigen::Matrix<T, 3, 1> get_zyx_euler_distance(Eigen::Matrix<T, 3, 1>& begEuler, 
 			endRel[i] = directDist;
 		}
 		else {
-			// ´ËÊ± begEuler[i] £¡= 0 ³ÉÁ¢
+			// æ­¤æ—¶ begEuler[i] ï¼= 0 æˆç«‹
 			endRel[i] = begEuler[i] < 0 ? -hopDist : hopDist;
 		}
 		endSum += std::fabs(endRel[i]);
@@ -114,7 +115,7 @@ Eigen::Matrix<T, 3, 1> get_zyx_euler_distance(Eigen::Matrix<T, 3, 1>& begEuler, 
 		equivSum += std::fabs(equivRel[i]);
 	}
 
-	// Ñ¡Ôñ×î¶Ì / ×î³¤µÄÏà¶ÔÔË¶¯¾àÀë
+	// é€‰æ‹©æœ€çŸ­ / æœ€é•¿çš„ç›¸å¯¹è¿åŠ¨è·ç¦»
 	if (chooseMimumDist) {
 		//ans = endSum < equivSum ? endRel : equivRel;
 		if (endSum < equivSum) {
@@ -138,110 +139,162 @@ Eigen::Matrix<T, 3, 1> get_zyx_euler_distance(Eigen::Matrix<T, 3, 1>& begEuler, 
 
 	return ans;
 }
+template <typename T>
+Eigen::Matrix<T, 3, 1> get_zyx_euler_distance(Eigen::Matrix<T, 3, 1>& begEuler, Eigen::Matrix<T, 3, 1>& midEuler, Eigen::Matrix<T, 3, 1>& endEuler) {
+	// æ¬§æ‹‰è§’è½¬æ¢åˆ°ç›¸å¯¹è¿åŠ¨: beg -> mid -> end
+	Eigen::Matrix<T, 3, 1> relEuler = get_zyx_euler_distance(begEuler, midEuler);
+	relEuler += get_zyx_euler_distance(midEuler, endEuler);
 
+	return relEuler;
+}
 
 /**
-* @brief  ¿Õ¼ä¹ì¼£µÄÔË¶¯²ÎÊı
+* @brief  ç©ºé—´è½¨è¿¹çš„è¿åŠ¨å‚æ•°
 */
 template <typename T = float>
-class TrajectoryConfig {
-private:
-	//! ¹ì¼£³¤¶È: Ö±Ïß- / Ô²»¡+
-	T dist;
-	//! ¹ì¼£½Úµã: Ö±ÏßÆğµã / Ô²»¡Ô²ĞÄ
-	Eigen::Matrix<T, 3, 1> knot;
-	//! ¹ì¼£ÌØÕ÷ÏòÁ¿: Ö±Ïß·½ÏòÏòÁ¿ / Ô²»¡Ğı×ªÊ¸Á¿
-	Eigen::Matrix<T, 3, 1> dir;
-
-public:
-	//! ¹ì¼£ËÙ¶È
-	T speed = 10;
-	//! ¹ì¼£Æ½»¬¶È
-	T smooth = 0;
-	//! ×Ô¶¨ÒåµÄĞòÁĞ»¯Êı¾İ
-	std::vector<T> appendix;
-
-	//friend class DiscreteTrajectory<T>;
-
-public:
-	TrajectoryConfig() {}
-	~TrajectoryConfig() {}
-
-	/**
-	* @brief  ¸½¼ÓÊı¾İ´¦Àí
-	* @param  data    ĞÂµÄ¸½¼ÓÊı¾İ
-	*/
-	uint8_t set_appendix(const std::vector<T> data) {
-		appendix = data;
-		return 0;
-	}
-	uint8_t add_appendix(const std::vector<T> data) {
-		appendix.insert(appendix.end(), data.begin(), data.end());
-		return 0;
-	}
-	uint8_t reset_appendix() {
-		appendix.clear();
-		return 0;
-	}
-
-
-	bool isArc() {
-		return (dist > 0);
-	}
-	bool isLine() {
-		return (dist < 0);
-	}
-};
+class TrajectoryConfig;
 
 
 /**
-* @brief  ¿Õ¼ä¹ì¼£µÄ¼¸ºÎ²ÎÊı
+* @brief  ç©ºé—´è½¨è¿¹çš„å‡ ä½•å‚æ•°
 */
+template <typename T = float>
+class DiscreteTrajectory;
+
+
+
 template <typename T = float>
 class DiscreteTrajectory {
-public:
-	//! ¹ì¼£¶Ëµã <Î»ÖÃ, Rzyx(deg), ¸½¼ÓÖá>
-	std::list<std::vector<T>> nodePoint;
-	//! ¹ì¼£ÖĞ¼äµã <Î»ÖÃ, Rzyx(deg), ¸½¼ÓÖá>
-	std::list<std::vector<T>> midPoint;
-	//! ¹ì¼£ĞÅÏ¢    Ö±Ïß    ·½Ïò(0:2),    -Ö±Ïß³¤¶È(3), null(4:6),     ËÙ¶È(7), Æ½»¬¶È(8)
-	//              Ô²»¡    Ô²ĞÄ×ø±ê(0:2),+Ô²»¡³¤¶È(3), Ğı×ªÊ¸Á¿(4:6), ËÙ¶È(7), Æ½»¬¶È(8)
-	std::list<std::vector<T>> trajInfo;
-
-	//! ÔË¶¯²ÎÊı
-	//std::list<TrajectoryConfig<T>> trajInfo;
-
-	//! µ±Ç°¹ì¼£µÄÖ¸Õë
-
-	//! °Úº¸²ÎÊı
-	std::list<Weave> waveInfo;
-	//! ¸ú×Ù²ÎÊı
-	std::list<Track> trackInfo;
-	//! º¸½Ó²ÎÊı
-	std::list<Arc_WeldingParaItem> weldInfo;
-
 private:
-	// ×ø±êÖáµ¥Î»ÏòÏòÁ¿
+	// åæ ‡è½´å•ä½å‘å‘é‡
 	static const Eigen::Matrix<T, 3, 1> unitX, unitY, unitZ;
 	static const T DT_PI;
+
+	//! å½“å‰è½¨è¿¹çš„æŒ‡é’ˆ
+	typename std::list<std::vector<T>>::iterator curPntIte , prePntIte, midPntIte;
+	typename std::list<TrajectoryConfig<T>>::iterator trajIte;
+
+
+public:
+	//! è½¨è¿¹ç«¯ç‚¹ <ä½ç½®, Rzyx(deg), é™„åŠ è½´>
+	std::list<std::vector<T>> nodePoint;
+	//! è½¨è¿¹ä¸­é—´ç‚¹ <ä½ç½®, Rzyx(deg), é™„åŠ è½´>
+	std::list<std::vector<T>> midPoint;
+	//! è¿åŠ¨å‚æ•°
+	std::list<TrajectoryConfig<T>> trajInfo;
+
 
 public:
 	DiscreteTrajectory() {};
 	~DiscreteTrajectory() {};
 
 	/**
-	* @brief  Çå³ıÊı¾İ²¢ÖØĞÂ¼ÇÂ¼Æğµã
-	* @param  pnt    ÆğµãÊı¾İ
+	* @brief  è½¨è¿¹è¿­ä»£å™¨å¤ä½
+	*/
+	uint8_t reset_iterator() {
+		if (nodePoint.size() < 1)
+			return 1;
+
+		curPntIte = nodePoint.begin();
+		midPntIte = midPoint.end();
+		trajIte = trajInfo.end();
+
+		prePntIte = nodePoint.end();
+
+		return 0;
+	}
+
+	/**
+	* @brief  æ¸…é™¤æ•°æ®å¹¶é‡æ–°è®°å½•èµ·ç‚¹
+	* @param  pnt    èµ·ç‚¹æ•°æ®
+	*/
+	uint8_t next() {
+		if (curPntIte == nodePoint.end()) {
+			return 1;
+		}
+
+		prePntIte = curPntIte;
+		curPntIte++;
+
+		// èµ·ç‚¹å¤„ç‰¹æ®Šå¤„ç†
+		if (prePntIte == nodePoint.begin()) {
+			midPntIte = midPoint.begin();
+			trajIte = trajInfo.begin();
+		}
+		else {
+			midPntIte++;
+			trajIte++;
+		}
+
+		return curPntIte == nodePoint.end();
+	}
+
+	uint8_t isLast() {
+		return curPntIte == nodePoint.end();
+	}
+
+	std::vector<T> get_nodePoint() {
+		return *curPntIte;
+	}
+	std::vector<T> get_preNodePoint() {
+		return *prePntIte;
+	}
+	std::vector<T> get_midPoint() {
+		return *midPntIte;
+	}
+	TrajectoryConfig<T> get_trajInfo() {
+		return *trajIte;
+	}
+
+	/**
+	* @brief  è®°å½•åœ†å¼§è½¨è¿¹
+	* @param  end    åœ†å¼§ç»ˆç‚¹
+	* @param  mid    åœ†å¼§ä¸­é—´ç‚¹
+	*/
+	std::vector<T> get_relative_distance() {
+		if (curPntIte == nodePoint.begin() || trajInfo.size() < 1) {
+			return {};
+		}
+		
+		int num = curPntIte->size();
+		std::vector<float> relEndMove(num, 0);
+		// ç»ˆç‚¹åˆ°èµ·ç‚¹çš„ç›¸å¯¹è¿åŠ¨
+		for (int i = 0; i < num; ++i) {
+			relEndMove[i] = (*curPntIte)[i] - (*prePntIte)[i];
+		}
+
+		// æ¬§æ‹‰è§’è½¬æ¢åˆ°ç›¸å¯¹è¿åŠ¨: beg -> mid -> end
+		Eigen::Matrix<T, 3, 1> begEuler = Eigen::Matrix<T, 3, 1>((*prePntIte)[3], (*prePntIte)[4], (*prePntIte)[5]);
+		Eigen::Matrix<T, 3, 1> midEuler = Eigen::Matrix<T, 3, 1>((*midPntIte)[3], (*midPntIte)[4], (*midPntIte)[5]);
+		Eigen::Matrix<T, 3, 1> endEuler = Eigen::Matrix<T, 3, 1>((*curPntIte)[3], (*curPntIte)[4], (*curPntIte)[5]);
+		// æ¬§æ‹‰è§’ç›¸å¯¹å€¼
+		Eigen::Matrix<T, 3, 1> relEuler = get_zyx_euler_distance(begEuler, midEuler, endEuler);
+		for (size_t i = 0; i < 3; ++i) {
+			relEndMove[3 + i] = relEuler[i];
+		}
+
+		return relEndMove;
+	}
+
+	std::vector<T> homogenize_nodepoint_euler(std::vector<T>& begPnt, std::vector<T>& endPnt) {
+		Eigen::Matrix<T, 3, 1> begEuler = Eigen::Matrix<T, 3, 1>(begPnt[3], begPnt[4], begPnt[5]);
+		Eigen::Matrix<T, 3, 1> endEuler = Eigen::Matrix<T, 3, 1>(endPnt[3], endPnt[4], endPnt[5]);
+		Eigen::Matrix<T, 3, 1> relEuler = get_zyx_euler_distance(begEuler, endEuler);
+		for (size_t i = 0; i < 3; ++i) {
+			endPnt[3 + i] = endEuler[i];
+		}
+		return { relEuler[0], relEuler[1], relEuler[2] };
+	}
+
+	/**
+	* @brief  æ¸…é™¤æ•°æ®å¹¶é‡æ–°è®°å½•èµ·ç‚¹
+	* @param  pnt    èµ·ç‚¹æ•°æ®
 	*/
 	uint8_t set_starting_point(const std::vector<T>& pnt = {}) {
 
 		nodePoint.clear();
 		midPoint.clear();
 		trajInfo.clear();
-
-		waveInfo.clear();
-		trackInfo.clear();
-		weldInfo.clear();
 
 		nodePoint.push_back(pnt);
 
@@ -253,140 +306,145 @@ public:
 	}
 
 	/**
-	* @brief  ¼ÇÂ¼Ö±Ïß¹ì¼£
-	* @param  pnt    Ö±ÏßÖÕµãÊı¾İ
+	* @brief  è®°å½•ç›´çº¿è½¨è¿¹
+	* @param  pnt    ç›´çº¿ç»ˆç‚¹æ•°æ®
 	*/
-	uint8_t add_line(const std::vector<T>& pnt, T vel = 10, T smooth = -1) {
+	uint8_t add_line(const std::vector<T>& pnt) {
 		if (nodePoint.size() < 1) return 1;
 
 		size_t N = nodePoint.front().size(), num = (std::min)(N, pnt.size());
+		std::vector<T> cur = nodePoint.back();
 
-		// Ìí¼Ó¹ì¼£µã
-		std::vector<T> tmp(N, 0), cur = nodePoint.back();
+		// æ·»åŠ è½¨è¿¹ç‚¹
+		std::vector<T> tmpEnd(N, 0);
 		for (size_t i = 0; i < num; ++i) {
-			tmp[i] = pnt[i];
+			tmpEnd[i] = pnt[i];
 		}
-		nodePoint.push_back(tmp);
+		std::vector<T> relEuler = homogenize_nodepoint_euler(cur, tmpEnd);
+		nodePoint.push_back(tmpEnd);
 
-		// Ìí¼ÓÖĞ¼äµã
+		// æ·»åŠ ä¸­é—´ç‚¹
+		std::vector<T> tmMid(N, 0);
 		for (size_t i = 0; i < N; ++i) {
-			tmp[i] = (cur[i] + tmp[i]) / 2;
+			tmMid[i] = (cur[i] + tmpEnd[i]) / 2;
 		}
+		// ä¸­é—´ç‚¹å§¿æ€è®¾å®šä¸ºèµ·ç‚¹å§¿æ€
 		for (size_t i = 3; i < 6; ++i) {
-			tmp[i] = cur[i];
+			tmMid[i] = cur[i] + relEuler[i-3];
 		}
-		midPoint.push_back(tmp);
+		midPoint.push_back(tmMid);
 
-		// ¼ÆËã¹ì¼£ĞÅÏ¢
-		std::vector<T> info(9, 0);
 		Eigen::Matrix<T, 3, 1> curPos(cur[0], cur[1], cur[2]), endPos(pnt[0], pnt[1], pnt[2]);
 
-		// Ö±Ïß·½Ïò
+		// è®¡ç®—è½¨è¿¹ä¿¡æ¯
+		TrajectoryConfig<T> trajCfg;
+
+		// èµ·ç‚¹ä½ç½®
+		trajCfg.knot.assign(curPos.data(), curPos.data() + 3);
+		// ç›´çº¿é•¿åº¦
+		trajCfg.dist = -1 * (endPos - curPos).norm();
+		// ç›´çº¿æ–¹å‘
 		Eigen::Matrix<T, 3, 1> dir = (endPos - curPos).normalized();
-		for (size_t i = 0; i < 3; ++i) {
-			info[i] = dir[i];
-		}
-		// Ö±Ïß³¤¶È
-		info[3] = -1 * (endPos - curPos).norm();
-		// ¹ì¼£ËÙ¶È
-		info[7] = vel;
-		// Æ½»¬¶È
-		info[8] = smooth;
-		trajInfo.push_back(info);
-		
+		trajCfg.dir.assign(dir.data(), dir.data() + 3);
+
+		// æ·»åŠ è½¨è¿¹ä¿¡æ¯
+		trajInfo.push_back(trajCfg);
+
 		return 0;
 	}
-	uint8_t add_line(const std::vector<T>& pnt, const Weave& waveCfg, const Track& trackCfg, const Arc_WeldingParaItem& weldCfg, T smooth = -1) {
-		add_line(pnt, weldCfg.WeldingSpeed, smooth);
+	uint8_t add_line(const std::vector<T>& pnt, const TrajectoryConfig<T>& trajCfg) {
 
-		waveInfo.push_back(waveCfg);
-		trackInfo.push_back(trackCfg);
-		weldInfo.push_back(weldCfg);
+		add_line(pnt);
+
+		trajInfo.back().copy_custom_data(trajCfg);
 
 		return 0;
 	}
 
 	/**
-	* @brief  ¼ÇÂ¼Ô²»¡¹ì¼£
-	* @param  end    Ô²»¡ÖÕµã
-	* @param  mid    Ô²»¡ÖĞ¼äµã
+	* @brief  è®°å½•åœ†å¼§è½¨è¿¹
+	* @param  end    åœ†å¼§ç»ˆç‚¹
+	* @param  mid    åœ†å¼§ä¸­é—´ç‚¹
 	*/
-	uint8_t add_arc(const std::vector<T>& end, const std::vector<T>& mid, T vel = 10, T smooth = -1) {
+	uint8_t add_arc(const std::vector<T>& end, const std::vector<T>& mid) {
 		if (nodePoint.size() < 1) return 1;
 		
 		size_t N = nodePoint.front().size(), num = (std::min)(N, end.size());
+		std::vector<T> cur = nodePoint.back();
 
-		// Ìí¼Ó¹ì¼£µã
-		std::vector<T> tmp(N, 0), cur = nodePoint.back();
+		// æ·»åŠ ä¸­é—´ç‚¹
+		std::vector<T> tmpMid = std::vector<T>(N, 0);
 		for (size_t i = 0; i < num; ++i) {
-			tmp[i] = end[i];
+			tmpMid[i] = mid[i];
 		}
-		nodePoint.push_back(tmp);
+		homogenize_nodepoint_euler(cur, tmpMid);
+		midPoint.push_back(tmpMid);
 
-		// Ìí¼ÓÖĞ¼äµã
-		tmp = std::vector<T>(N, 0);
+		// æ·»åŠ è½¨è¿¹ç‚¹
+		std::vector<T> tmpEnd = std::vector<T>(N, 0);
 		for (size_t i = 0; i < num; ++i) {
-			tmp[i] = mid[i];
+			tmpEnd[i] = end[i];
 		}
-		midPoint.push_back(tmp);
+		homogenize_nodepoint_euler(tmpMid, tmpEnd);
+		nodePoint.push_back(tmpEnd);
 
-		// ¼ÆËã¹ì¼£ĞÅÏ¢
+		// è®¡ç®—è½¨è¿¹ä¿¡æ¯
 		Eigen::Matrix<T, 3, 1> begPnt(cur[0], cur[1], cur[2]), midPnt(mid[0], mid[1], mid[2]), endPnt(end[0], end[1], end[2]);
 		Eigen::Matrix<T, 7, 1> arcInfo = construct_arc_trajectory(begPnt, midPnt, endPnt);
-		std::vector<T> info(9);
-		// ¹ì¼£ĞÎ×´
-		for (size_t i = 0; i < 7; ++i) {
-			info[i] = arcInfo[i];
-		}
-		// ¹ì¼£ËÙ¶È
-		info[7] = vel;
-		// Æ½»¬¶È
-		info[8] = smooth;
 
-		trajInfo.push_back(info);
+		// è®¡ç®—è½¨è¿¹ä¿¡æ¯
+		TrajectoryConfig<T> trajCfg;
 
-		return 0;
-	}
-	uint8_t add_arc(const std::vector<T>& end, const std::vector<T>& mid, const Weave& waveCfg, const Track& trackCfg, const Arc_WeldingParaItem& weldCfg, T smooth = -1) {
-		add_arc(end, mid, weldCfg.WeldingSpeed, smooth);
+		// åœ†å¿ƒåæ ‡
+		trajCfg.knot = { arcInfo[0], arcInfo[1], arcInfo[2] };
+		// é•¿åº¦
+		trajCfg.dist = arcInfo[3];
+		// æ—‹è½¬çŸ¢é‡
+		trajCfg.dir = { arcInfo[4], arcInfo[5], arcInfo[6] };
 
-		waveInfo.push_back(waveCfg);
-		trackInfo.push_back(trackCfg);
-		weldInfo.push_back(weldCfg);
+		trajInfo.push_back(trajCfg);
 
 		return 0;
 	}
+	uint8_t add_arc(const std::vector<T>& end, const std::vector<T>& mid, const TrajectoryConfig<T>& trajCfg) {
+		add_arc(end, mid);
+
+		trajInfo.back().copy_custom_data(trajCfg);
+
+		return 0;
+	}
+
 
 	/**
-	* @brief  ¹Õ½Ç¹ı¶É
-	* @param  end    Ô²»¡ÖÕµã
-	* @param  mid    Ô²»¡ÖĞ¼äµã
+	* @brief  æ‹è§’è¿‡æ¸¡
+	* @param  end    åœ†å¼§ç»ˆç‚¹
+	* @param  mid    åœ†å¼§ä¸­é—´ç‚¹
 	*/
 	uint8_t corner_transition(T inDist = -1, T outDist = -1) {
 		if (nodePoint.size() < 1) return 1;
 
 		size_t N = nodePoint.front().size();
-		// N < 6 Ê±²»Ö§³Ö¸Ãº¯Êı
+		// N < 6 æ—¶ä¸æ”¯æŒè¯¥å‡½æ•°
 		if (N < 6) return 2;
 
-		// ½Úµãµü´úÆ÷
+		// èŠ‚ç‚¹è¿­ä»£å™¨
 		auto endPntIte = nodePoint.begin(), begPntIte = endPntIte++;
-		// ÖĞ¼äµãµü´úÆ÷
+		// ä¸­é—´ç‚¹è¿­ä»£å™¨
 		auto midPntIte = midPoint.begin();
-		// ¹ì¼£ĞÅÏ¢µü´úÆ÷
+		// è½¨è¿¹ä¿¡æ¯è¿­ä»£å™¨
 		auto infoIte = trajInfo.begin();
 
 		while (infoIte != trajInfo.end()) {
 			auto transPnt = transition_interpolate(*begPntIte, *endPntIte, *infoIte, { inDist, inDist/2, std::fabs((*infoIte)[3])/2, -outDist/2, -outDist });
-			// ²åÈëÂ·¾¶µã
+			// æ’å…¥è·¯å¾„ç‚¹
 			nodePoint.insert(endPntIte, transPnt.front());
 			nodePoint.insert(endPntIte, transPnt.back());
 			begPntIte = endPntIte++;
-			// ²åÈëÖĞ¼äµã
+			// æ’å…¥ä¸­é—´ç‚¹
 			midPoint.insert(midPntIte++, transPnt[1]);
 			midPoint.insert(midPntIte, transPnt[3]);
 
-			// Æğµã¹ı¶É¹ì¼£
+			// èµ·ç‚¹è¿‡æ¸¡è½¨è¿¹
 			std::vector<T> begTraj(9, 0);
 			for (size_t i = 0; i < 3; ++i) {
 				begTraj[i] = (*infoIte)[i];
@@ -394,7 +452,7 @@ public:
 			begTraj[3] = -inDist;
 			begTraj[7] = (*infoIte)[7];
 
-			// ÖÕµã¹ı¶É¹ì¼£
+			// ç»ˆç‚¹è¿‡æ¸¡è½¨è¿¹
 			std::vector<T> endTraj(9, 0);
 			for (size_t i = 0; i < 3; ++i) {
 				endTraj[i] = (*infoIte)[i];
@@ -402,29 +460,29 @@ public:
 			endTraj[3] = -outDist;
 			endTraj[7] = (*infoIte)[7];
 
-			// ²åÈëÆğµã¹ı¶É¹ì¼£ĞÅÏ¢
+			// æ’å…¥èµ·ç‚¹è¿‡æ¸¡è½¨è¿¹ä¿¡æ¯
 			trajInfo.insert(infoIte, begTraj);
-			// Ô­Ê¼¹ì¼£ĞÅÏ¢ĞŞ¸Ä
+			// åŸå§‹è½¨è¿¹ä¿¡æ¯ä¿®æ”¹
 			(*infoIte++)[3] -= begTraj[3] + endTraj[3];
-			// ²åÈëÖÕµã¹ı¶É¹ì¼£ĞÅÏ¢
+			// æ’å…¥ç»ˆç‚¹è¿‡æ¸¡è½¨è¿¹ä¿¡æ¯
 			trajInfo.insert(infoIte, endTraj);
 
 		}
 		
 		//begPntIte = nodePoint.begin();
-		//// ÉÏÒ»Î»×Ë
+		//// ä¸Šä¸€ä½å§¿
 		//Eigen::Matrix<T, N, 1> prePnt = (*begPntIte++);
 		//std::cout << "curPnt = " << prePnt.transpose() << std::endl;
 
 		//Eigen::Matrix<T, 3, 1> begEuler(prePnt[3], prePnt[4], prePnt[5]), endEuler = (*begPntIte).segment<3>(3);
 
 		//while (begPntIte != nodePoint.end()) {
-		//	// µ±Ç°Î»×Ë
+		//	// å½“å‰ä½å§¿
 		//	Eigen::Matrix<T, N, 1> curPnt = (*begPntIte++);
 		//	std::cout << "curPnt = " << curPnt.transpose() << std::endl;
 		//	std::cout << curPnt[0] - prePnt[0] << ", " << curPnt[1] - prePnt[1] << ", " << curPnt[2] - prePnt[2] << ", ";
 		//	endEuler = curPnt.segment<3>(3);
-		//	// Å·À­½ÇÏà¶ÔÖµ
+		//	// æ¬§æ‹‰è§’ç›¸å¯¹å€¼
 		//	Eigen::Matrix<T, 3, 1> relEuler = get_zyx_euler_distance(begEuler, endEuler);
 		//	for (size_t i = 0; i < 3; ++i) {
 		//		std::cout << relEuler[i] << ", ";
@@ -437,11 +495,11 @@ public:
 	}
 
 	/**
-	* @brief  ¹Õ½Ç¼õËÙ
-	* @param  angularVel    ¹ì¼£×î´ó½ÇËÙ¶È£¬Å·À­½ÇÊ¸Á¿ËÙ¶È
+	* @brief  æ‹è§’å‡é€Ÿ
+	* @param  angularVel    è½¨è¿¹æœ€å¤§è§’é€Ÿåº¦ï¼Œæ¬§æ‹‰è§’çŸ¢é‡é€Ÿåº¦
 	*/
 	uint8_t corner_slowdown(T angularVel) {
-		// ±éÀú¹ì¼£
+		// éå†è½¨è¿¹
 		auto nodePointIte = nodePoint.begin();
 		auto midPointIte = midPoint.begin();
 		auto infoIte = trajInfo.begin();
@@ -449,7 +507,7 @@ public:
 		while (infoIte != trajInfo.end()) {
 			std::vector<float> curBuffer = *(nodePointIte++);
 
-			// Å·À­½Ç×ª»»µ½Ïà¶ÔÔË¶¯: beg -> mid -> end
+			// æ¬§æ‹‰è§’è½¬æ¢åˆ°ç›¸å¯¹è¿åŠ¨: beg -> mid -> end
 			Eigen::Vector3f begEuler = Eigen::Vector3f(curBuffer[3], curBuffer[4], curBuffer[5]);
 			Eigen::Vector3f endEuler = Eigen::Vector3f((*midPointIte)[3], (*midPointIte)[4], (*midPointIte)[5]);
 			Eigen::Vector3f relEuler = get_zyx_euler_distance(begEuler, endEuler);
@@ -458,7 +516,7 @@ public:
 			relEuler += get_zyx_euler_distance(begEuler, endEuler);
 
 			T sumAngle = std::sqrt(relEuler[0]* relEuler[0] + relEuler[1]* relEuler[1] + relEuler[2]* relEuler[2]);
-			// ËÙ¶ÈĞŞÕı
+			// é€Ÿåº¦ä¿®æ­£
 			if (sumAngle / angularVel > std::fabs((*infoIte)[3]) / (*infoIte)[7]) {
 				(*infoIte)[7] = angularVel * std::fabs((*infoIte)[3]) / sumAngle;
 			}
@@ -471,17 +529,17 @@ public:
 	}
 	
 	/**
-	* @brief  ¾ùÔÈ·Ö¸ô
-	* @param  separation    ¼ä¸ô¿í¶È
+	* @brief  å‡åŒ€åˆ†éš”
+	* @param  separation    é—´éš”å®½åº¦
 	*/
 	uint8_t equally_divide(const std::vector<T>& separation) {
-		// ·Ö¶Î×Ü¾àÀë
+		// åˆ†æ®µæ€»è·ç¦»
 		T phaseDist = 0.0;
 		for (size_t i = 0; i < separation.size(); ++i) {
 			phaseDist += separation[i];
 		}
 
-		// ±éÀú¹ì¼£
+		// éå†è½¨è¿¹
 		auto nodePointIte = nodePoint.begin();
 		auto midPointIte = midPoint.begin();
 		auto infoIte = trajInfo.begin();
@@ -489,29 +547,29 @@ public:
 		Eigen::Vector3f begEuler((*nodePointIte)[3], (*nodePointIte)[4], (*nodePointIte)[5]), endEuler = begEuler;
 		while (infoIte != trajInfo.end()) {
 			std::vector<T> begBuffer = *(nodePointIte++);
-			// µ±Ç°µã¾àÀë
+			// å½“å‰ç‚¹è·ç¦»
 			T curDist = 0.0, midDist = 0.0, trajDist = std::fabs((*infoIte)[3]);
 
 			std::vector<T> relEndMove(begBuffer.size(), 0);
-			// ÖÕµãµ½ÆğµãµÄÏà¶ÔÔË¶¯
+			// ç»ˆç‚¹åˆ°èµ·ç‚¹çš„ç›¸å¯¹è¿åŠ¨
 			for (size_t i = 0; i < begBuffer.size(); ++i) {
 				relEndMove[i] = (*nodePointIte)[i] - begBuffer[i];
 			}
 
-			// Å·À­½ÇÏà¶Ô¾àÀë
+			// æ¬§æ‹‰è§’ç›¸å¯¹è·ç¦»
 			begEuler = Eigen::Vector3f(begBuffer[3], begBuffer[4], begBuffer[5]);
 			endEuler = Eigen::Vector3f((*nodePointIte)[3], (*nodePointIte)[4], (*nodePointIte)[5]);
 			Eigen::Vector3f relEuler = get_zyx_euler_distance(begEuler, endEuler);
 			begEuler = endEuler;
 
-			// ÍêÕûÖÜÆÚ¸öÊı
+			// å®Œæ•´å‘¨æœŸä¸ªæ•°
 			int numPeriod = std::floor(std::fabs((*infoIte)[3]) / phaseDist);
 			bool isRedundant = true;
 			for (size_t i = 0; i < numPeriod + 1; ++i) {
 				if (!isRedundant)
 					break;
 				for (size_t j = 0; j < separation.size(); ++j) {
-					// ²»¹»Ìí¼ÓĞÂµÄ¹ì¼£
+					// ä¸å¤Ÿæ·»åŠ æ–°çš„è½¨è¿¹
 					if (std::fabs((*infoIte)[3]) < separation[j]) {
 						isRedundant = false;
 						break;
@@ -521,7 +579,7 @@ public:
 					midDist = curDist - separation[j] / 2;
 					
 					std::vector<T> sepaPoint(begBuffer.size(), 0), curMidPoint(begBuffer.size(), 0), sepaTraj = *infoIte;
-					// ¼ä¸ôµãÎ»ÖÃ
+					// é—´éš”ç‚¹ä½ç½®
 					Eigen::Matrix<T, 3, 1> curPos(0,0,0), midPos(0,0,0), endMidPos(0,0,0);
 
 					if ((*infoIte)[3] < 0) {
@@ -530,9 +588,9 @@ public:
 						curPos = begPos + dir * curDist;
 						midPos = begPos + dir * midDist;
 						endMidPos = begPos + dir * (trajDist + curDist) / 2;
-						// ĞÂÔö¹ì¼£ĞÅÏ¢
+						// æ–°å¢è½¨è¿¹ä¿¡æ¯
 						sepaTraj[3] = -separation[j];
-						// Ô­Ê¼¹ì¼£ĞŞ¸Ä
+						// åŸå§‹è½¨è¿¹ä¿®æ”¹
 						(*infoIte)[3] += separation[j];
 					}
 					else if ((*infoIte)[3] > 0) {
@@ -544,12 +602,12 @@ public:
 						curPos = Eigen::AngleAxis<T>(theta * curDist / trajDist, norm) * radius + center;
 						midPos = Eigen::AngleAxis<T>(theta * midDist / trajDist, norm) * radius + center;
 						endMidPos = Eigen::AngleAxis<T>(theta * (trajDist + curDist) / 2 / trajDist, norm) * radius + center;
-						// ĞÂÔö¹ì¼£ĞÅÏ¢
+						// æ–°å¢è½¨è¿¹ä¿¡æ¯
 						sepaTraj[3] = separation[j];
 						sepaTraj[4] = norm[0] * separation[j] / trajDist * theta;
 						sepaTraj[5] = norm[1] * separation[j] / trajDist * theta;
 						sepaTraj[6] = norm[2] * separation[j] / trajDist * theta;
-						// Ô­Ê¼¹ì¼£ĞŞ¸Ä
+						// åŸå§‹è½¨è¿¹ä¿®æ”¹
 						(*infoIte)[3] -= separation[j];
 						(*infoIte)[4] = norm[0] * (trajDist - curDist) / trajDist * theta;
 						(*infoIte)[5] = norm[1] * (trajDist - curDist) / trajDist * theta;
@@ -558,10 +616,10 @@ public:
 					for (size_t k = 0; k < 3; ++k) {
 						sepaPoint[k] = curPos[k];
 						curMidPoint[k] = midPos[k];
-						// Ô­Ê¼¹ì¼£ÖĞ¼äµãĞŞ¸Ä
+						// åŸå§‹è½¨è¿¹ä¸­é—´ç‚¹ä¿®æ”¹
 						(*midPointIte)[k] = endMidPos[k];
 					}
-					// ¼ä¸ôµãÅ·À­½Ç
+					// é—´éš”ç‚¹æ¬§æ‹‰è§’
 					for (size_t k = 3; k < 6; ++k) {
 						sepaPoint[k] = begBuffer[k] + curDist / std::fabs((*infoIte)[3]) * relEuler[k - 3];
 						curMidPoint[k] = begBuffer[k] + midDist / std::fabs((*infoIte)[3]) * relEuler[k - 3];
@@ -587,37 +645,37 @@ public:
 	}
 
 	/**
-	* @brief  ¹Õ½Ç¹ı¶Éµã²åÖµ
-	* @param  begPnt      ¹ì¼£Æğµã
-	* @param  endPnt      ¹ì¼£ÖÕµã
-	* @param  info        ¹ì¼£ĞÅÏ¢
-	* @param  distList    ¹ı¶Éµã¾àÀëÊı×é, + ´ÓÆğµã¼ÆËã; - ´ÓÖÕµã¼ÆËã
-	* @return ¹ı¶ÉµãÎ»ÖÃÊı×é
+	* @brief  æ‹è§’è¿‡æ¸¡ç‚¹æ’å€¼
+	* @param  begPnt      è½¨è¿¹èµ·ç‚¹
+	* @param  endPnt      è½¨è¿¹ç»ˆç‚¹
+	* @param  info        è½¨è¿¹ä¿¡æ¯
+	* @param  distList    è¿‡æ¸¡ç‚¹è·ç¦»æ•°ç»„, + ä»èµ·ç‚¹è®¡ç®—; - ä»ç»ˆç‚¹è®¡ç®—
+	* @return è¿‡æ¸¡ç‚¹ä½ç½®æ•°ç»„
 	*/
 	std::vector<std::vector<T>> transition_interpolate(const std::vector<T>& begPnt, const std::vector<T>& endPnt, const std::vector<T>& info, const std::vector<T>& distList) {
-		// ·µ»ØÖµ
+		// è¿”å›å€¼
 		std::vector<std::vector<T>> ans(distList.size(), std::vector<T>(begPnt.size(), 0));
 
-		// Æğµã´¦ TCP ×ËÌ¬
+		// èµ·ç‚¹å¤„ TCP å§¿æ€
 		Eigen::Matrix<T, 3, 3> begMat = RzyxToRotMat(begPnt[5], begPnt[4], begPnt[3]);
-		// ÖÕµã´¦ TCP ×ËÌ¬
+		// ç»ˆç‚¹å¤„ TCP å§¿æ€
 		Eigen::Matrix<T, 3, 3> endMat = RzyxToRotMat(endPnt[5], endPnt[4], endPnt[3]);
-		// ÇĞÏß·½Ïò
+		// åˆ‡çº¿æ–¹å‘
 		Eigen::Matrix<T, 3, 1> infoTail3(info[4], info[5], info[6]), infoHead3(info[0], info[1], info[2]);
 		Eigen::Matrix<T, 3, 1> begHead3(begPnt[0], begPnt[1], begPnt[2]), endHead3(endPnt[0], endPnt[1], endPnt[2]);
 		Eigen::Matrix<T, 3, 1> begTan = info[3] > 0 ? (infoTail3.cross(begHead3 - infoHead3)).normalized() : infoHead3;
 		Eigen::Matrix<T, 3, 1> endTan = info[3] > 0 ? (infoTail3.cross(endHead3 - infoHead3)).normalized() : infoHead3;
-		// ·¨Ïß·½Ïò
+		// æ³•çº¿æ–¹å‘
 		Eigen::Matrix<T, 3, 1> begNorm = begTan.cross(begMat.col(2)).normalized();
 		Eigen::Matrix<T, 3, 1> endNorm = endTan.cross(endMat.col(2)).normalized();
-		// ±ê×¼º¸Ç¹·½Ïò
+		// æ ‡å‡†ç„Šæªæ–¹å‘
 		Eigen::Matrix<T, 3, 1> begUprightDir = begNorm.cross(begTan).normalized();
 		Eigen::Matrix<T, 3, 1> endUprightDir = endNorm.cross(endTan).normalized();
-		// Æğµãº¸Ç¹·½Ïò×ª»»µ½ÖÕµã
+		// èµ·ç‚¹ç„Šæªæ–¹å‘è½¬æ¢åˆ°ç»ˆç‚¹
 		// todo: Eigen::AngleAxis<T>(1, infoTail3)
 		Eigen::Matrix<T, 3, 1> begUprightDir_end = info[3] > 0 ? (Eigen::AngleAxis<T>(infoTail3.norm(), infoTail3.normalized())*begUprightDir).eval() : begUprightDir;
 
-		// ¸©Ñö½Ç±ä»¯: ÈÆÇĞÏß·½Ïò, Ä¬ÈÏĞ¡½Ç¶È±ä»¯
+		// ä¿¯ä»°è§’å˜åŒ–: ç»•åˆ‡çº¿æ–¹å‘, é»˜è®¤å°è§’åº¦å˜åŒ–
 		T dotProd = begUprightDir_end.dot(endUprightDir);
 		dotProd = std::fabs(dotProd) > 1 ? (dotProd / std::fabs(dotProd)) : dotProd;
 		T pitchAngle = std::acos(dotProd);
@@ -627,35 +685,35 @@ public:
 		//std::cout << "endMat = \n" << endMat << "\n===========\n" << std::endl;
 		for (size_t i = 0; i < distList.size(); ++i) {
 			
-			// ¹ı¶Éµã
+			// è¿‡æ¸¡ç‚¹
 			std::vector<T> transPnt(begPnt.size(), 0);
-			// ¹ı¶Éµã×ËÌ¬
+			// è¿‡æ¸¡ç‚¹å§¿æ€
 			Eigen::Matrix<T, 3, 3> transMat = Eigen::Matrix<T, 3, 3>::Identity();
-			// ¹ı¶Éµã¾àÀëÕ¼±È
+			// è¿‡æ¸¡ç‚¹è·ç¦»å æ¯”
 			T lambda = 0.0;
 
-			// ´ÓÆğµãËãÆğ
+			// ä»èµ·ç‚¹ç®—èµ·
 			if (distList[i] > 0) {
 
 				//std::cout << "\nNodeMat = \n" << begMat << std::endl;
 				//std::cout << "NodePnt = " << begPnt.transpose() << std::endl;
 
 				T inDist = distList[i];
-				// ÍÆÀ­½Ç¾ÀÕı: ÈÆ·¨Ïß·½Ïò, Ä¬ÈÏĞ¡½Ç¶È±ä»¯
+				// æ¨æ‹‰è§’çº æ­£: ç»•æ³•çº¿æ–¹å‘, é»˜è®¤å°è§’åº¦å˜åŒ–
 				transMat.col(2) = begUprightDir;
 				transMat.col(1) = begMat.col(1).dot(begTan) >= 0 ? begTan : -begTan;
 				transMat.col(0) = (transMat.col(1).cross(transMat.col(2))).normalized();
-				// ¸©Ñö½ÇĞŞÕı
+				// ä¿¯ä»°è§’ä¿®æ­£
 				transMat = (Eigen::AngleAxis<T>(pitchAngle * inDist / std::fabs(info[3]), begTan) * transMat).eval();
 
-				// Ö±Ïß
+				// ç›´çº¿
 				if (info[3] < 0) {
 					Eigen::Matrix<T, 3, 1> dir = begHead3 + begTan * inDist;
 					for (size_t i = 0; i < 3; ++i) {
 						transPnt[i] = dir[i];
 					}
 				}
-				// Ô²»¡
+				// åœ†å¼§
 				else if (info[3] > 0) {
 					Eigen::Matrix<T, 3, 1> center = infoHead3 + Eigen::AngleAxis<T>(inDist / std::fabs(info[3]), infoTail3) * (begHead3 - infoHead3);
 					for (size_t i = 0; i < 3; ++i) {
@@ -666,25 +724,25 @@ public:
 
 				lambda = inDist / std::fabs(info[3]);
 			}
-			// ´ÓÖÕµãËãÆğ
+			// ä»ç»ˆç‚¹ç®—èµ·
 			else if (distList[i] < 0) {
 				T outDist = -distList[i];
 
-				// ÍÆÀ­½Ç¾ÀÕı: ÈÆ·¨Ïß·½Ïò, Ä¬ÈÏĞ¡½Ç¶È±ä»¯
+				// æ¨æ‹‰è§’çº æ­£: ç»•æ³•çº¿æ–¹å‘, é»˜è®¤å°è§’åº¦å˜åŒ–
 				transMat.col(2) = endUprightDir;
 				transMat.col(1) = endMat.col(1).dot(endTan) >= 0 ? endTan : -endTan;
 				transMat.col(0) = (transMat.col(1).cross(transMat.col(2))).normalized();
-				// ¸©Ñö½ÇĞŞÕı
+				// ä¿¯ä»°è§’ä¿®æ­£
 				transMat = (Eigen::AngleAxis<T>(pitchAngle * outDist / std::fabs(info[3]), -endTan) * transMat).eval();
 
-				// Ö±Ïß
+				// ç›´çº¿
 				if (info[3] < 0) {
 					Eigen::Matrix<T, 3, 1> dir = endHead3 - endTan * outDist;
 					for (size_t i = 0; i < 3; ++i) {
 						transPnt[i] = dir[i];
 					}
 				}
-				// Ô²»¡
+				// åœ†å¼§
 				else if (info[3] > 0) {
 					Eigen::Matrix<T, 3, 1> center = infoHead3 + Eigen::AngleAxis<T>(outDist / std::fabs(info[3]), -infoTail3) * (endHead3 - infoHead3);
 					for (size_t i = 0; i < 3; ++i) {
@@ -696,12 +754,12 @@ public:
 				lambda = 1.0 - outDist / std::fabs(info[3]);
 			}
 
-			// ¹ı¶ÉµãÅ·À­½Ç
+			// è¿‡æ¸¡ç‚¹æ¬§æ‹‰è§’
 			Eigen::Matrix<T, 3, 1> transEuler = transMat.eulerAngles(2, 1, 0).reverse() * 180 / DT_PI;
 			for (size_t j = 0; j < 3; ++j) {
 				transPnt[3 + j] = transEuler[j];
 			}
-			// ¸½¼ÓÖá²å²¹
+			// é™„åŠ è½´æ’è¡¥
 			for (size_t j = 6; j < begPnt.size(); ++j) {
 				transPnt[j] = begPnt[j] + (endPnt[j] - begPnt[j]) * lambda;
 			}
@@ -714,37 +772,37 @@ public:
 private:
 
 	/**
-	* @brief  ¿Õ¼äÈıµã¹¹½¨Ô²»¡¹ì¼£
-	* @param  beg    Æğµã×ø±ê
-	* @param  mid    ÖĞ¼äµã×ø±ê
-	* @param  end    ÖÕµã×ø±ê
-	* @return Ô²»¡¹ì¼£ĞÅÏ¢
+	* @brief  ç©ºé—´ä¸‰ç‚¹æ„å»ºåœ†å¼§è½¨è¿¹
+	* @param  beg    èµ·ç‚¹åæ ‡
+	* @param  mid    ä¸­é—´ç‚¹åæ ‡
+	* @param  end    ç»ˆç‚¹åæ ‡
+	* @return åœ†å¼§è½¨è¿¹ä¿¡æ¯
 	*/
 	Eigen::Matrix<T, 7, 1> construct_arc_trajectory(Eigen::Matrix<T, 3, 1> beg, Eigen::Matrix<T, 3, 1> mid, Eigen::Matrix<T, 3, 1> end) {
 		Eigen::Matrix<T, 7, 1> info;
 
 		Eigen::Matrix<T, 3, 1> a = beg - mid, b = end - mid;
-		// µ±Ö±Ïß´¦Àí
+		// å½“ç›´çº¿å¤„ç†
 		if (a.cross(b).squaredNorm() < 1e-12) {
 			info.head(3) = (end - beg).normalized();
 			info(3) = -1 * (end - beg).norm();
 			return info;
 		}
 
-		// Ô²ĞÄÎ»ÖÃ
+		// åœ†å¿ƒä½ç½®
 		info.head(3) = (a.squaredNorm()*b - b.squaredNorm()*a).cross(a.cross(b)) / (2 * (a.cross(b)).squaredNorm()) + mid;
-		// °ë¾¶·½Ïò
+		// åŠå¾„æ–¹å‘
 		Eigen::Matrix<T, 3, 1> op1 = (beg - info.head(3)).normalized(), op2 = (mid - info.head(3)).normalized(), op3 = (end - info.head(3)).normalized();
-		// °ë¾¶¼Ğ½Ç
+		// åŠå¾„å¤¹è§’
 		T q12 = std::acos(op1.dot(op2)), q13 = std::acos(op1.dot(op3));
-		// ·¨Ïß·½Ïò
+		// æ³•çº¿æ–¹å‘
 		Eigen::Matrix<T, 3, 1> n12 = op1.cross(op2), n13 = op1.cross(op3);
-		// Ô²»¡ÔË¶¯Æ½ÃæµÄ·¨Ïß·½Ïò
+		// åœ†å¼§è¿åŠ¨å¹³é¢çš„æ³•çº¿æ–¹å‘
 		Eigen::Matrix<T, 3, 1> normal = op1.cross(op3);
-		// Ô²ĞÄ½Ç½Ç¶È
+		// åœ†å¿ƒè§’è§’åº¦
 		float theta = std::acos(op1.dot(op3));
-		// ĞŞÕıÔ²ĞÄ½ÇºÍÕı·¨Ïò
-		// 2,3 ÔÚ 1 µÄÁ½²à
+		// ä¿®æ­£åœ†å¿ƒè§’å’Œæ­£æ³•å‘
+		// 2,3 åœ¨ 1 çš„ä¸¤ä¾§
 		if (n12.dot(n13) < 0) {
 			normal = -n13;
 			theta = 2 * DT_PI - theta;
@@ -759,29 +817,29 @@ private:
 			normal = n12;
 		}
 
-		// Ô²»¡³¤¶È
+		// åœ†å¼§é•¿åº¦
 		info(3) = (beg - info.head(3)).norm() * theta;
-		// ¸½¼ÓĞı×ª½Ç¶ÈµÄ·¨Ïß·½Ïò
+		// é™„åŠ æ—‹è½¬è§’åº¦çš„æ³•çº¿æ–¹å‘
 		info.tail(3) = normal.normalized() * theta;
 
 		return info;
 	}
 
 	/**
-	* @brief  XYZ Å·À­½Ç×ªĞı×ª¾ØÕó
-	* @param  qz    ÈÆ z ×ª½Ç(deg)
-	* @param  qy    ÈÆ y ×ª½Ç(deg)
-	* @param  qx    ÈÆ x ×ª½Ç(deg)
+	* @brief  XYZ æ¬§æ‹‰è§’è½¬æ—‹è½¬çŸ©é˜µ
+	* @param  qz    ç»• z è½¬è§’(deg)
+	* @param  qy    ç»• y è½¬è§’(deg)
+	* @param  qx    ç»• x è½¬è§’(deg)
 	*/
 	Eigen::Matrix<T, 3, 3> RzyxToRotMat(T qz, T qy, T qx) {
 		return (Eigen::AngleAxis<T>(qz * DT_PI / 180, unitZ) * Eigen::AngleAxis<T>(qy * DT_PI / 180, unitY) * Eigen::AngleAxis<T>(qx * DT_PI / 180, unitX)).matrix();
 	}
 
 	/**
-	* @brief  ZYX Å·À­½Ç×ªĞı×ª¾ØÕó
-	* @param  qx    ÈÆ x ×ª½Ç(deg)
-	* @param  qy    ÈÆ y ×ª½Ç(deg)
-	* @param  qz    ÈÆ z ×ª½Ç(deg)
+	* @brief  ZYX æ¬§æ‹‰è§’è½¬æ—‹è½¬çŸ©é˜µ
+	* @param  qx    ç»• x è½¬è§’(deg)
+	* @param  qy    ç»• y è½¬è§’(deg)
+	* @param  qz    ç»• z è½¬è§’(deg)
 	*/
 	Eigen::Matrix<T, 3, 3> RxyzToRotMat(T qx, T qy, T qz) {
 		return (Eigen::AngleAxis<T>(qx * DT_PI / 180, unitX) * Eigen::AngleAxis<T>(qy * DT_PI / 180, unitY) * Eigen::AngleAxis<T>(qz * DT_PI / 180, unitZ)).matrix();
@@ -791,7 +849,7 @@ private:
 
 template <typename T>
 const T DiscreteTrajectory<T>::DT_PI = 3.14159265358979323846;
-// ×ø±êÖáµ¥Î»ÏòÏòÁ¿
+// åæ ‡è½´å•ä½å‘å‘é‡
 template <typename T>
 const Eigen::Matrix<T, 3, 1> DiscreteTrajectory<T>::unitX = Eigen::Matrix<T, 3, 1>(1, 0, 0);
 template <typename T>
@@ -799,3 +857,71 @@ const Eigen::Matrix<T, 3, 1> DiscreteTrajectory<T>::unitY = Eigen::Matrix<T, 3, 
 template <typename T>
 const Eigen::Matrix<T, 3, 1> DiscreteTrajectory<T>::unitZ = Eigen::Matrix<T, 3, 1>(0, 0, 1);
 
+
+
+template <typename T = float>
+class TrajectoryConfig {
+private:
+	//! è½¨è¿¹é•¿åº¦: ç›´çº¿- / åœ†å¼§+
+	T dist;
+	//! è½¨è¿¹èŠ‚ç‚¹: ç›´çº¿èµ·ç‚¹ / åœ†å¼§åœ†å¿ƒ
+	std::vector<T> knot;
+	//! è½¨è¿¹ç‰¹å¾å‘é‡: ç›´çº¿æ–¹å‘å‘é‡ / åœ†å¼§æ—‹è½¬çŸ¢é‡
+	std::vector<T> dir;
+
+public:
+	//! è½¨è¿¹é€Ÿåº¦
+	T speed = -1;
+	//! è½¨è¿¹å¹³æ»‘åº¦
+	T smooth = -1;
+	//! è‡ªå®šä¹‰çš„åºåˆ—åŒ–æ•°æ®
+	std::vector<T> appendix;
+
+	friend class DiscreteTrajectory<T>;
+
+public:
+	TrajectoryConfig() {}
+	~TrajectoryConfig() {}
+
+	uint8_t copy_custom_data(const TrajectoryConfig<T>& data) {
+		speed = data.speed;
+		smooth = data.smooth;
+		appendix = data.appendix;
+
+		return 0;
+	}
+
+	/**
+	* @brief  é™„åŠ æ•°æ®å¤„ç†
+	* @param  data    æ–°çš„é™„åŠ æ•°æ®
+	*/
+	uint8_t set_appendix(const std::vector<T> data) {
+		appendix = data;
+		return 0;
+	}
+	uint8_t add_appendix(const std::vector<T> data) {
+		appendix.insert(appendix.end(), data.begin(), data.end());
+		return 0;
+	}
+	uint8_t reset_appendix() {
+		appendix.clear();
+		return 0;
+	}
+
+
+	bool isArc() {
+		return (dist > 0);
+	}
+	bool isLine() {
+		return (dist < 0);
+	}
+	T get_dist() {
+		return isLine() ? -dist : dist;
+	}
+	std::vector<T> get_knot() {
+		return knot;
+	}
+	std::vector<T> get_dir() {
+		return dir;
+	}
+};

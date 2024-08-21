@@ -1,4 +1,4 @@
-#pragma warning(disable : 4996)
+ï»¿#pragma warning(disable : 4996)
 #pragma once
 
 #include<vector>
@@ -20,67 +20,77 @@ constexpr static double M_PI = 3.14159265358979323846;
 class ZauxAxis {
 	static std::vector<int> AxisIdxList;
 	ZauxAxis();
-	// ¶ÁÈ¡ÒÑ¾­ÏÂÔØµ½¿ØÖÆ¿¨ÖĞµÄÖá²ÎÊı
+	// è¯»å–å·²ç»ä¸‹è½½åˆ°æ§åˆ¶å¡ä¸­çš„è½´å‚æ•°
 	//uint8_t load_uploaded_config();
-	// ¼ÓÔØÖá²ÎÊı
+	// åŠ è½½è½´å‚æ•°
 	//uint8_t download_config();
-	// »ñÈ¡»º³åÎ»ÖÃ
+	// è·å–ç¼“å†²ä½ç½®
 	//std::vector<float> get_axis_param(const std::vector<int>& axisList);
 
 private:
-	// ÖáÀàĞÍ
+	// è½´ç±»å‹
 	int atype;
-	// Âö³åµ±Á¿
+	// è„‰å†²å½“é‡
 	float units;
-	// ÔË¶¯Ñ§²ÎÊı
+	// è¿åŠ¨å­¦å‚æ•°
 	float speed, accel, decel;
 };
+
+std::vector<float> serialize_weld_param(const Weave& waveCfg, const Arc_WeldingParaItem& weldCfg, const Track& trackCfg);
+
+uint8_t read_weld_param(const std::vector<float>& param, Weave& waveCfg, Arc_WeldingParaItem& weldCfg, Track& trackCfg);
 
 class ZauxRobot {
 public:
 	enum class ConnType{INIT = 0, FK = 1, IK = 2};
 
-	// ¿ØÖÆÆ÷¾ä±ú
+	// æ§åˆ¶å™¨å¥æŸ„
 	ZMC_HANDLE handle_ = NULL;
-	// ¹¤¾ßÖáÓë¹Ø½ÚÖáµÄ¹ØÁªÄ£Ê½
+	// å·¥å…·è½´ä¸å…³èŠ‚è½´çš„å…³è”æ¨¡å¼
 	ConnType connType = ConnType::INIT;
 
-	// ¹Ø½ÚÖá
-	std::vector<int> jointAxisIdx_ = { 0,1,2,3,4,5 };
-	// Äæ½âÎ»ÖÃÖá
-	std::vector<int> ikPosAxisIdx_ = { 9,10,11 };
-	// TCP ×ËÌ¬Öá
-	//std::vector<int> tcpAngleAxisIdx_ = { 12,13,14 };
-	std::vector<int> tcpAngleAxisIdx_ = { 21,22,23 };
-	// TCP Î»ÖÃÖá
-	//std::vector<int> tcpPosAxisIdx_ = { 9, 10, 11 };
-	std::vector<int> tcpPosAxisIdx_ = { 18, 19, 20 };
-	// ¸½¼ÓÖá
-	std::vector<int> appAxisIdx_ = { 6,7,8 };
-	// Í¹ÂÖÖá
-	std::vector<int> camAxisIdx_ = { 36,37,38 };
-	// °Ú¶¯Öá
-	std::vector<int> swingAxisIdx_ = { 40,41,42 };
-	// ²å²¹Ê¸Á¿Öá
-	std::vector<int> connpathAxisIdx_ = { 39 };
-	// ¹ı¶ÉÖá
-	std::vector<int> transAxisIdx_ = { 18,19,20,21,22,23,24,25,26 };
+	// å®é™…è½´ï¼šå…³èŠ‚è½´ã€é™„åŠ è½´ã€TCPä½ç½®ã€TCPå§¿æ€ã€å‡¸è½®è½´ã€æ‰§è¡Œè½´
+	// å…³èŠ‚è½´
+	std::vector<int> jointAxisIdx = { 0,1,2,3,4,5 };
+	// é™„åŠ è½´
+	std::vector<int> appAxisIdx = { 6,7,8 };
+	// TCP ä½ç½®è½´
+	//std::vector<int> tcpPosAxisIdx = { 9,10,11 };
+	std::vector<int> tcpPosAxisIdx = { 15,16,17 };
+	// TCP å§¿æ€è½´
+	std::vector<int> tcpAngleAxisIdx = { 12,13,14 };
+	// å‡¸è½®è½´
+	std::vector<int> camAxisIdx = { 36,37,38 };
+	// æ‘†ç„Šè½´
+	std::vector<int> swingAxisIdx = { 40,41,42 };
+	// æ‰§è¡Œè½´
+	std::vector<int> excuteAxis = { 18,19,20,21,22,23,24,25,26 };
 
-	// °Ú¶¯±êÖ¾Î»Ë÷Òı
+	// ç»„åˆè½´ï¼šæ­£è§£ = å…³èŠ‚ + é™„åŠ è½´
+	std::vector<int> fkAxis;
+	// é€†è§£ = TCPä½ç½® + TCPå§¿æ€ + é™„åŠ è½´
+	std::vector<int> ikAxis;
+	// æ‘†ç„Š = æ‘†ç„Šè½´ + TCPå§¿æ€ + é™„åŠ è½´
+	std::vector<int> swingAxis;
+
+	// å…³èŠ‚é€Ÿåº¦å¯„å­˜å™¨
+	std::vector<int> jointSpeedVR = { 77,78,79,80,81,82,83,84,85, 1077,1077,1077,1078,1078,1078 };
+
+	// æ‘†åŠ¨æ ‡å¿—ä½ç´¢å¼•
 	size_t swingFlagIdx = 1000;
 
-	// Âö³åµ±Á¿
+	// è„‰å†²å½“é‡
 	float axisUnits = 1000;
 
 
 public:
-	ZauxRobot() {}
-	ZauxRobot(const std::vector<int>& jointAxisIdx, const std::vector<int>& ikPosAxisIdx, const std::vector<int>& tcpAngleAxisIdx,
-		const std::vector<int>& tcpPosAxisIdx, const std::vector<int>& appAxisIdx, const std::vector<int>& camAxisIdx, const std::vector<int>& swingAxisIdx,
-		const std::vector<int>& connpathAxisIdx
-	);
+	ZauxRobot();
+	ZauxRobot(const std::vector<int>& jointAxisIdx_, const std::vector<int>& appAxisIdx_,
+		const std::vector<int>& tcpPosAxisIdx_, const std::vector<int>& tcpAngleAxisIdx_,
+		const std::vector<int>& camAxisIdx_, const std::vector<int>& swingAxis_,
+		const std::vector<int>& excuteAxis_);
 	/**
-	* @brief Í¨¹ıÍø¿ÚÁ¬½Ó¿ØÖÆÆ÷
+	* @brief é€šè¿‡ç½‘å£è¿æ¥æ§åˆ¶å™¨
 	*/
 	int32 connect_eth(char *ip_addr);
 	int32 connect_pci(uint32 cardNum);
@@ -88,11 +98,11 @@ public:
 	int32 connect(std::string addr);
 
 	/**
-	* @brief ÉÕÂ¼ basic ³ÌĞòµ½¿ØÖÆÆ÷
-	* @param basPath    basic ³ÌĞòÂ·¾¶
-	* @param mode       ÉÕÂ¼Ä£Ê½£»
-	         0          ÉÕÂ¼µ½ RAM
-			 1          ÉÕÂ¼µ½ ROM
+	* @brief çƒ§å½• basic ç¨‹åºåˆ°æ§åˆ¶å™¨
+	* @param basPath    basic ç¨‹åºè·¯å¾„
+	* @param mode       çƒ§å½•æ¨¡å¼ï¼›
+	         0          çƒ§å½•åˆ° RAM
+			 1          çƒ§å½•åˆ° ROM
 	*/
 	int32 load_basic_pragma(const char *basPath, uint32_t mode = 0);
 	int32 load_basic_project(const char *basPath, uint32_t mode = 0);
@@ -100,61 +110,65 @@ public:
 	//uint8_t enable_zaux_log(int logMode);
 
 	/**
-	* @brief Éè¶¨¿ØÖÆ¿¨¾ä±ú
-	* @param handle    ¿ØÖÆ¿¨¾ä±ú
+	* @brief è®¾å®šæ§åˆ¶å¡å¥æŸ„
+	* @param handle    æ§åˆ¶å¡å¥æŸ„
 	*/
 	int32 set_handle(ZMC_HANDLE handle);
 	/**
-	* @brief Éè¶¨ÖáºÅ
-	* @param jointAxisIdx       ¹Ø½ÚÖá
-	* @param ikPosAxisIdx       Äæ½âÎ»ÖÃÖá
-	* @param tcpAngleAxisIdx    ÊÀ½ç×ø±êÏµÏÂ TCP ½Ç¶ÈÖá: Äæ½â×ËÌ¬Öá
-	* @param tcpPosAxisIdx      ÊÀ½ç×ø±êÏµÏÂ TCP Î»ÖÃÖá: Ìí¼Ó¸½¼ÓÖáºóµÄ TCP Î»ÖÃ
-	* @param appAxisIdx         ¸½¼ÓÖá
-	* @param camAxisIdx         Í¹ÂÖÖá
-	* @param swingAxisIdx       °Ú¶¯Öá
-	* @param connpathAxisIdx    ²å²¹Ê¸Á¿Öá
+	* @brief è®¾å®šè½´å·
+	* @param jointAxisIdx       å…³èŠ‚è½´
+	* @param ikPosAxisIdx       é€†è§£ä½ç½®è½´
+	* @param tcpAngleAxisIdx    ä¸–ç•Œåæ ‡ç³»ä¸‹ TCP è§’åº¦è½´: é€†è§£å§¿æ€è½´
+	* @param tcpPosAxisIdx      ä¸–ç•Œåæ ‡ç³»ä¸‹ TCP ä½ç½®è½´: æ·»åŠ é™„åŠ è½´åçš„ TCP ä½ç½®
+	* @param appAxisIdx         é™„åŠ è½´
+	* @param camAxisIdx         å‡¸è½®è½´
+	* @param swingAxisIdx       æ‘†åŠ¨è½´
+	* @param connpathAxisIdx    æ’è¡¥çŸ¢é‡è½´
 	*/
-	int32 set_axis(const std::vector<int>& jointAxisIdx, const std::vector<int>& ikPosAxisIdx, const std::vector<int>& tcpAngleAxisIdx,
-		const std::vector<int>& tcpPosAxisIdx, const std::vector<int>& appAxisIdx, const std::vector<int>& camAxisIdx, const std::vector<int>& swingAxisIdx,
-		const std::vector<int>& connpathAxisIdx);
+	int32 set_axis(const std::vector<int>& jointAxisIdx_, const std::vector<int>& tcpAngleAxisIdx_,
+		const std::vector<int>& tcpPosAxisIdx_, const std::vector<int>& appAxisIdx_,
+		const std::vector<int>& camAxisIdx_, const std::vector<int>& swingAxis_,
+		const std::vector<int>& excuteAxis_);
+	int32 derive_config();
 
 	/**
-	* @brief ¶Ï¿ªÁ¬½Ó
+	* @brief æ–­å¼€è¿æ¥
 	*/
 	int32 disconnect();
 
 	/**
-	* @brief ÇĞ»»µ½Õı½âÄ£Ê½£ºÃ¿´ÎÖ´ĞĞ¹Ø½ÚÔË¶¯Ê±ĞèÒª°ó¶¨Ò»´Î£¬Í¬²½¼ÆËã¹¤¾ß×ø±ê±ä»¯
+	* @brief åˆ‡æ¢åˆ°æ­£è§£æ¨¡å¼ï¼šæ¯æ¬¡æ‰§è¡Œå…³èŠ‚è¿åŠ¨æ—¶éœ€è¦ç»‘å®šä¸€æ¬¡ï¼ŒåŒæ­¥è®¡ç®—å·¥å…·åæ ‡å˜åŒ–
 	*/
 	int32 forward_kinematics(int delay = 1e3);
 
 	/**
-	* @brief ÇĞ»»µ½Äæ½âÄ£Ê½£ºÃ¿´ÎÖ´ĞĞ¹¤¾ß×ø±êÏµÔË¶¯Ê±ĞèÒª°ó¶¨Ò»´Î£¬Í¬²½¼ÆËã¹Ø½Ú×ø±ê±ä»¯
+	* @brief åˆ‡æ¢åˆ°é€†è§£æ¨¡å¼ï¼šæ¯æ¬¡æ‰§è¡Œå·¥å…·åæ ‡ç³»è¿åŠ¨æ—¶éœ€è¦ç»‘å®šä¸€æ¬¡ï¼ŒåŒæ­¥è®¡ç®—å…³èŠ‚åæ ‡å˜åŒ–
 	*/
 	int32 inverse_kinematics(int delay = 1e3);
 
 	int32 wait_idle(int axisIdx);
 
+	int32 get_kinematic_mode();
+
 	/**
-	* @brief  ¶ÁÈ¡¶àÖá²ÎÊı
-	* @param       axisList     ĞèÒª»ñÈ¡²ÎÊıµÄÖáºÅÁĞ±í
-	* @param       paramName    ²ÎÊıÃû³Æ
-	* @param[out]  paramList    ·µ»ØµÄ²ÎÊıÁĞ±í
+	* @brief  è¯»å–å¤šè½´å‚æ•°
+	* @param       axisList     éœ€è¦è·å–å‚æ•°çš„è½´å·åˆ—è¡¨
+	* @param       paramName    å‚æ•°åç§°
+	* @param[out]  paramList    è¿”å›çš„å‚æ•°åˆ—è¡¨
 	*/
 	int32 get_axis_param(const std::vector<int>& axisList, char* paramName, std::vector<float>& paramList);
 
 	/**
-	* @brief ÉèÖÃ¶àÖá²ÎÊı
-	* @param       axisList     ĞèÒª»ñÈ¡²ÎÊıµÄÖáºÅÁĞ±í
-	* @param       paramName    ²ÎÊıÃû³Æ
-	* @param       paramList    ²ÎÊıÊı×é
-	* @param       principal    Ö÷ÖáË÷Òı: -1 Á¢¼´ÉèÖÃ; >0 »º³åÖĞÉèÖÃ
+	* @brief è®¾ç½®å¤šè½´å‚æ•°
+	* @param       axisList     éœ€è¦è·å–å‚æ•°çš„è½´å·åˆ—è¡¨
+	* @param       paramName    å‚æ•°åç§°
+	* @param       paramList    å‚æ•°æ•°ç»„
+	* @param       principal    ä¸»è½´ç´¢å¼•: -1 ç«‹å³è®¾ç½®; >0 ç¼“å†²ä¸­è®¾ç½®
 	*/
 	int32 set_axis_param(const std::vector<int>& axisList, char* paramName, const std::vector<float>& paramList, int principal = -1);
 
 	/**
-	* @brief ±£´ætableÊı¾İµ½±¾µØ
+	* @brief ä¿å­˜tableæ•°æ®åˆ°æœ¬åœ°
 	*/
 	int32 save_table(size_t startIdx, size_t num = 1, const std::string& path = "./tableData.txt");
 
@@ -164,82 +178,85 @@ public:
 
 
 	/**
-	* @brief switch_automation£ºÇĞ»»×Ô¶¯/ÊÖ¶¯Ä£Ê½
+	* @brief switch_automationï¼šåˆ‡æ¢è‡ªåŠ¨/æ‰‹åŠ¨æ¨¡å¼
 	*/
 	int32 switch_automation(bool setAuto);
 
 	/**
-	* @brief Öáµã¶¯
-	* @param       idx     ÔË¶¯ÖáºÅ
-	* @param       type    ÔË¶¯ÀàĞÍ
-					  0      ÔË¶¯½áÊø
-					  ¡À1    ¹Ø½ÚÕı/¸ºÏòÔË¶¯
-					  ¡À2    ÊÀ½ç×ø±êÏµÕı/¸ºÏòÔË¶¯
-					  ¡À3    ¹¤¾ß×ø±êÏµÕı/¸ºÏòÔË¶¯
-	* @param       dir     ÔË¶¯·½Ïò
+	* @brief è½´ç‚¹åŠ¨
+	* @param       idx     è¿åŠ¨è½´å·
+	* @param       type    è¿åŠ¨ç±»å‹
+					  0      è¿åŠ¨ç»“æŸ
+					  Â±1    å…³èŠ‚æ­£/è´Ÿå‘è¿åŠ¨
+					  Â±2    ä¸–ç•Œåæ ‡ç³»æ­£/è´Ÿå‘è¿åŠ¨
+					  Â±3    å·¥å…·åæ ‡ç³»æ­£/è´Ÿå‘è¿åŠ¨
+	* @param       dir     è¿åŠ¨æ–¹å‘
 	*/
 	int32 jog_moving(int idx, int type, int dir);
 
 	/**
 	* @brief set_auto_SpeedRatio
-	* @param       speedRatio    ËÙ¶È±ÈÂÊ
+	* @param       speedRatio    é€Ÿåº¦æ¯”ç‡
 	*/
 	int32 set_manual_SpeedRatio(float speedRatio);
 	int32 set_auto_SpeedRatio(float speedRatio);
 
 	/**
 	* @brief set_acceleration_time
-	* @param       time    ¼Ó¼õËÙÊ±¼ä
+	* @param       time    åŠ å‡é€Ÿæ—¶é—´
 	*/
 	int32 set_acceleration_time(float time);
+	int32 set_axis_speed(const std::vector<float>& speedList);
+	std::vector<float> get_axis_speed();
 
 	/**
-	* @brief move(abs) »ù´¡ÔË¶¯Ö¸Áî·â×°£¬½öÏÂ·¢ÔË¶¯Ö¸Áî
-	* @param       axis       ÔË¶¯ÖáºÅ
-	* @param       relMove    Ïà¶ÔÔË¶¯¾àÀë
-	* @param       endMove    Ä¿±êÔË¶¯Î»ÖÃ
-	* @param       speed      Ö÷ÖáËÙ¶È
+	* @brief move(abs) åŸºç¡€è¿åŠ¨æŒ‡ä»¤å°è£…ï¼Œä»…ä¸‹å‘è¿åŠ¨æŒ‡ä»¤
+	* @param       axis       è¿åŠ¨è½´å·
+	* @param       relMove    ç›¸å¯¹è¿åŠ¨è·ç¦»
+	* @param       endMove    ç›®æ ‡è¿åŠ¨ä½ç½®
+	* @param       speed      ä¸»è½´é€Ÿåº¦
 	*/
 	int32 move(const std::vector<int>& axis, const std::vector<float>& relMove, float speed = -1.0);
 	int32 moveABS(const std::vector<int>& axis, const std::vector<float>& endMove, float speed = -1.0);
 
 	/**
 	* @brief movePtp
-	* @param       axis          ¹Ø½ÚÔË¶¯ÖáºÅ
-	* @param       relEndMove    Ïà¶ÔÔË¶¯¾àÀë
-	* @param       speedRatio    ËÙ¶È±ÈÂÊ
+	* @param       axis          å…³èŠ‚è¿åŠ¨è½´å·
+	* @param       relEndMove    ç›¸å¯¹è¿åŠ¨è·ç¦»
+	* @param       speedRatio    é€Ÿåº¦æ¯”ç‡
 	*/
 	int32 move_ptp(const std::vector<float>& relEndMove, float speedRatio = -1.0);
 	int32 move_ptp_abs(const std::vector<float>& endMove, float speedRatio = -1.0);
 
 	/**
 	* @brief moveJ
-	* @param       axis          ¹Ø½ÚÔË¶¯ÖáºÅ
-	* @param       relEndMove    Ïà¶ÔÔË¶¯¾àÀë
-	* @param       speedRatio    ËÙ¶È±ÈÂÊ
+	* @param       axis          å…³èŠ‚è¿åŠ¨è½´å·
+	* @param       relEndMove    ç›¸å¯¹è¿åŠ¨è·ç¦»
+	* @param       speedRatio    é€Ÿåº¦æ¯”ç‡
 	*/
-	int32 moveJ(const std::vector<float>& relEndMove, float speedRatio = 1.0);
-	int32 moveJ(const std::vector<int>& axis, const std::vector<float>& relEndMove, float speedRatio = 1.0);
+	int32 moveJ(const std::vector<float>& relEndMove, float speedRatio = -1.0, bool replace = 1);
+	int32 moveJ(const std::vector<int>& axis, const std::vector<float>& relEndMove, float speedRatio = -1.0);
 
 	/**
 	* @brief moveJ_abs
-	* @param      axis          ¹Ø½ÚÔË¶¯ÖáºÅ
-	* @param      endMove       ¾ø¶ÔÔË¶¯Î»ÖÃ
-	* @param      speedRatio    ËÙ¶È±ÈÂÊ
+	* @param      axis          å…³èŠ‚è¿åŠ¨è½´å·
+	* @param      endMove       ç»å¯¹è¿åŠ¨ä½ç½®
+	* @param      speedRatio    é€Ÿåº¦æ¯”ç‡
 	*/
-	int32 moveJ_abs(const std::vector<float>& endMove, float speedRatio = 1.0);
-	int32 moveJ_abs(const std::vector<int>& axis, const std::vector<float>& endMove, float speedRatio = 1.0);
+	int32 moveJ_abs(const std::vector<float>& endMove, float speedRatio = -1.0, bool replace = 1);
+	int32 moveJ_abs(const std::vector<int>& axis, const std::vector<float>& endMove, float speedRatio = -1.0);
 
 	int32 moveL(const std::vector<int>& axis, const std::vector<float>& relMove);
+	int32 moveL(const std::vector<int>& axis, const std::vector<float>& begPoint, std::vector<float>& endPoint);
 	int32 moveC(const std::vector<int>& axis, const std::vector<float>& begPoint, std::vector<float>& midPoint, std::vector<float>& endPoint,
 				  int imode = 0);
 
-	// º¸»ú¿ØÖÆ
+	// ç„Šæœºæ§åˆ¶
 	int32 wlder_on(float current, float voltage);
 	int32 wlder_off();
 
-	int32 execute_discrete_trajectory_abs(DiscreteTrajectory<float>& discreteTrajectory);
-	int32 execute_discrete_trajectory(DiscreteTrajectory<float>& discreteTrajectory);
+	int32 execute_discrete_trajectory_abs(DiscreteTrajectory<float>& discreteTrajectory, bool replace = 1);
+	int32 execute_discrete_trajectory(DiscreteTrajectory<float>& discreteTrajectory, bool replace = 1);
 
 	int32 swing_trajectory(DiscreteTrajectory<float>& discreteTrajectory, const Weave& waveCfg);
 	int32 swing_tri(DiscreteTrajectory<float>& discreteTrajectory, const Weave& waveCfg);
@@ -249,6 +266,7 @@ public:
 	int32 swing_trajectory(DiscreteTrajectory<float>& discreteTrajectory);
 	int32 swing_single_tri(DiscreteTrajectory<float>& discreteTrajectory, const Weave& waveCfg);
 	int32 swing_single_sin(DiscreteTrajectory<float>& discreteTrajectory, const Weave& waveCfg);
+	int32 swing_single_empty(DiscreteTrajectory<float>& discreteTrajectory);
 
 	int32 update_track_config(const Track& trackCfg);
 
@@ -257,15 +275,15 @@ public:
 	int32 handle_zaux_error(int32 errCode);
 
 	/**
-	* @brief ÉÏÎ»»ú½ô¼±Í£Ö¹
+	* @brief ä¸Šä½æœºç´§æ€¥åœæ­¢
 	*/
 	int32 emergency_stop();
 	/**
-	* @brief ÉÏÎ»»ú½ô¼±ÔİÍ£
+	* @brief ä¸Šä½æœºç´§æ€¥æš‚åœ
 	*/
 	int32 emergency_pause();
 	/**
-	* @brief ÉÏÎ»»ú½ô¼±»Ö¸´
+	* @brief ä¸Šä½æœºç´§æ€¥æ¢å¤
 	*/
 	int32 emergency_resume();
 
